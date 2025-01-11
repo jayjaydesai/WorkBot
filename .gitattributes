@@ -1,0 +1,8 @@
+# Handle line endings automatically
+* text=auto
+
+# Explicitly set binary files to be treated as binary
+*.png binary
+*.jpg binary
+*.pdf binary
+*.exe binary
