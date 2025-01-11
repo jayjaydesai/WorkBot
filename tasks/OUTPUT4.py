@@ -50,7 +50,7 @@ def process_bulk_file(bulk_file_path, aisle_id):
 
         # Populate license plate data
         for row in range(2, aisle_sheet.max_row + 1, 2):  # Even rows for locations
-            for col in range(3, 31):  # Columns C to AD
+            for col in range(3, 33):  # Columns C to AF
                 location_cell = aisle_sheet.cell(row=row, column=col)
                 license_cell = aisle_sheet.cell(row=row + 1, column=col)  # Just below the location cell
 
