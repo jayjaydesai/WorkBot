@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, send_file
 from dotenv import load_dotenv
 import os
+import subprocess  # Import subprocess to run external scripts
 from tasks.ALLOUTPUTS import run_all_outputs_for_all_aisles  # Import your workflow script
 
 # Define the Flask app
@@ -62,6 +63,7 @@ def index():
     # Render the home page
     return render_template("index.html")
 
+
 @app.route("/download/<filename>")
 def download_file(filename):
     """Serve processed files for download."""
@@ -76,7 +78,46 @@ def download_file(filename):
         <br><a href="/" style="text-decoration:none; padding:10px; background-color:red; color:white; border-radius:5px;">Back to Home</a>
         """
 
+@app.route("/run-checkempty", methods=["POST"])
+def run_checkempty():
+    try:
+        # Check if a file is uploaded
+        file = request.files.get("file")
+        if not file:
+            return """
+            <h2>Error: No file uploaded.</h2>
+            <br><a href="/" style="text-decoration:none; padding:10px; background-color:red; color:white; border-radius:5px;">Back to Home</a>
+            """
+
+        # Save the uploaded BULK.xlsx file to the 'uploads' folder
+        upload_folder = os.path.abspath(UPLOAD_FOLDER)
+        os.makedirs(upload_folder, exist_ok=True)  # Ensure the folder exists
+        file_path = os.path.join(upload_folder, "BULK.xlsx")
+        file.save(file_path)
+
+        # Run the scripts
+        scripts = ["OUTPUT11.py", "OUTPUT12.py", "OUTPUT13.py"]
+        base_path = os.path.abspath(os.path.join("tasks"))  # Absolute path to the tasks folder
+
+        for script in scripts:
+            script_path = os.path.join(base_path, script)
+            subprocess.run(["python", script_path], capture_output=True, text=True, check=True)
+
+        # Return a success message with the download link
+        return f"""
+        <h2>Request Processed Successfully</h2>
+        <ul>
+            <li><a href="/download/EMPTYLOCATION.xlsx" target="_blank">Download EMPTYLOCATION.xlsx</a></li>
+        </ul>
+        <br><a href="/" style="text-decoration:none; padding:10px; background-color:blue; color:white; border-radius:5px;">Back to Home</a>
+        """
+    except Exception as e:
+        # Handle unexpected errors
+        return f"""
+        <h2>An unexpected error occurred:</h2>
+        <pre>{str(e)}</pre>
+        <br><a href="/" style="text-decoration:none; padding:10px; background-color:red; color:white; border-radius:5px;">Back to Home</a>
+        """
+
 if __name__ == "__main__":
-    # Use host='0.0.0.0' for deployment and disable debug mode in production
-    debug_mode = os.getenv("FLASK_DEBUG", "True").lower() == "true"
-    app.run(debug=debug_mode, host="0.0.0.0")
+    app.run()
