@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ProcessHub</title>
     <style>
-        /* General Reset */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -14,7 +13,6 @@
             color: #333;
         }
 
-        /* Header Styling */
         header {
             background-color: #007bff;
             color: white;
@@ -27,7 +25,6 @@
             font-size: 2.5em;
         }
 
-        /* Main Content Styling */
         main {
             max-width: 800px;
             margin: 30px auto;
@@ -37,38 +34,23 @@
             border-radius: 8px;
         }
 
-        /* Form Styling */
-        form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
         label {
             font-weight: bold;
         }
 
-        select, input[type="file"], input[type="text"] {
+        select, input[type="file"], input[type="text"], button {
+            margin-top: 10px;
             padding: 10px;
             font-size: 1em;
             border: 1px solid #ccc;
             border-radius: 5px;
             width: 100%;
-            box-sizing: border-box;
-        }
-
-        select:focus, input[type="file"]:focus, input[type="text"]:focus {
-            border-color: #007bff;
-            outline: none;
         }
 
         button {
-            padding: 10px 15px;
             background-color: #007bff;
             color: white;
             border: none;
-            border-radius: 5px;
-            font-size: 1em;
             cursor: pointer;
         }
 
@@ -76,102 +58,95 @@
             background-color: #0056b3;
         }
 
-        .task-section {
-            margin-bottom: 20px;
+        .task-inputs {
+            display: none;
         }
 
-        /* Future Task Placeholder */
-        .future-task {
-            color: #555;
-            font-style: italic;
-        }
-
-        /* Footer Styling */
         footer {
             text-align: center;
             margin-top: 30px;
             font-size: 0.9em;
             color: #777;
         }
-
-        /* Responsive Design */
-        @media (max-width: 600px) {
-            header h1 {
-                font-size: 1.8em;
-            }
-
-            main {
-                padding: 15px;
-            }
-
-            select, input[type="file"], input[type="text"], button {
-                font-size: 0.9em;
-            }
-        }
     </style>
+    <script>
+function toggleInputs() {
+    const task = document.getElementById("task").value;
+    const form = document.getElementById("task-form");
+
+    // Hide all task-specific input sections by default and disable their inputs
+    document.querySelectorAll(".task-inputs").forEach(section => {
+        section.style.display = "none";
+        section.querySelectorAll("input").forEach(input => {
+            input.disabled = true; // Disable all inputs in hidden sections
+        });
+    });
+
+    // Update form action and show inputs based on the selected task
+    if (task === "bulk_report") {
+        form.action = "/";
+        const bulkInputs = document.getElementById("bulk-report-inputs");
+        bulkInputs.style.display = "block";
+        bulkInputs.querySelectorAll("input").forEach(input => {
+            input.disabled = false; // Enable inputs for Bulk Report
+        });
+    } else if (task === "check_empty_location") {
+        form.action = "/run-checkempty";
+        const checkEmptyInputs = document.getElementById("check-empty-location-inputs");
+        checkEmptyInputs.style.display = "block";
+        checkEmptyInputs.querySelectorAll("input").forEach(input => {
+            input.disabled = false; // Enable inputs for CHECK EMPTY LOCATION
+        });
+    } else {
+        form.action = "#";
+    }
+}
+
+    </script>
 </head>
 <body>
     <header>
         <h1>ProcessHub</h1>
     </header>
     <main>
-        <form id="task-form" action="/" method="post" enctype="multipart/form-data">
+        <form id="task-form" method="post" enctype="multipart/form-data" action="#">
             <!-- Task Selection -->
             <div class="task-section">
                 <label for="task">Select a Task:</label>
                 <select name="task" id="task" onchange="toggleInputs()" required>
                     <option value="">-- Select a Task --</option>
                     <option value="bulk_report">Bulk Report</option>
-                    <option value="replen_stock">Replen Stock</option>
+                    <option value="replen_stock">Replen Stock (Still Not Integrated)</option>
+                    <option value="check_empty_location">Check Empty location</option>
                 </select>
             </div>
 
             <!-- Bulk Report Inputs -->
-            <div id="bulk-report-inputs" style="display: none;">
-                <label for="file">Select the BULK file:</label>
-                <input type="file" name="file" id="file">
-
+            <div id="bulk-report-inputs" class="task-inputs">
+                <label for="file-bulk-report">Select the BULK file:</label>
+                <input type="file" name="file" id="file-bulk-report" required>
                 <label for="aisle">Enter Aisle ID (e.g., A09) or leave blank for all aisles:</label>
                 <input type="text" name="aisle" id="aisle" placeholder="A09">
             </div>
 
             <!-- Replen Stock Inputs -->
-            <div id="replen-stock-inputs" style="display: none;">
-                <label for="replen-file">Select Files for REPLEN Task:</label>
-                <input type="file" name="replen_files[]" id="replen-files" multiple>
+            <div id="replen-stock-inputs" class="task-inputs">
+                <label for="file-replen">Select Files for REPLEN Task:</label>
+                <input type="file" name="replen_files[]" id="file-replen" multiple>
+            </div>
+
+            <!-- CHECK EMPTY LOCATION Inputs -->
+            <div id="check-empty-location-inputs" class="task-inputs">
+                <label for="file-check-empty">Upload the Latest BULK.xlsx:</label>
+                <input type="file" name="file" id="file-check-empty" accept=".xlsx" required>
             </div>
 
             <!-- Submit Button -->
             <button type="submit">Process Task</button>
         </form>
-
-        <!-- Placeholder for Future Tasks -->
-        <div class="future-task">
-            <p>More tasks coming soon...</p>
-        </div>
     </main>
     <footer>
         <p>&copy; 2025 ProcessHub. All rights reserved.</p>
     </footer>
-
-    <script>
-        function toggleInputs() {
-            const task = document.getElementById("task").value;
-            const form = document.getElementById("task-form");
-            
-            if (task === "bulk_report") {
-                form.action = "/";
-                document.getElementById("bulk-report-inputs").style.display = "block";
-                document.getElementById("replen-stock-inputs").style.display = "none";
-            } else if (task === "replen_stock") {
-                form.action = "/replen";
-                document.getElementById("bulk-report-inputs").style.display = "none";
-                document.getElementById("replen-stock-inputs").style.display = "block";
-            } else {
-                document.getElementById("bulk-report-inputs").style.display = "none";
-                document.getElementById("replen-stock-inputs").style.display = "none";
-            }
-        }
-    </script>
 </body>
 </html>
