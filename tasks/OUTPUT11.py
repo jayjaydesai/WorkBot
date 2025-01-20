@@ -16,6 +16,7 @@ def process_files():
         # Log environment details
         print(f"Current working directory: {Path.cwd()}")
         print(f"Python version: {sys.version}")
+        print(f"Environment variables: {os.environ}")
 
         # Set base_path dynamically
         base_path = Path(__file__).resolve().parent.parent
@@ -55,9 +56,9 @@ def process_files():
         except Exception as e:
             raise RuntimeError(f"Failed to load BULK.xlsx: {e}")
 
-        # Debugging: Print dataframes' shapes
-        print(f"A16.xlsx shape: {a16_df.shape}")
-        print(f"BULK.xlsx shape: {bulk_df.shape}")
+        # Debugging: Print dataframes' shapes and columns
+        print(f"A16.xlsx shape: {a16_df.shape}, columns: {list(a16_df.columns)}")
+        print(f"BULK.xlsx shape: {bulk_df.shape}, columns: {list(bulk_df.columns)}")
 
         # Merge dataframes
         print("Merging dataframes...")
@@ -81,8 +82,13 @@ def process_files():
 
         print("Processing completed successfully.")
     except Exception as e:
-        print(f"Error occurred: {str(e)}")
+        # Log error to a file
+        error_log = Path(__file__).parent / "error_log.txt"
+        with open(error_log, "w") as log_file:
+            log_file.write(f"Error occurred:\n{str(e)}")
+        print(f"Error logged in {error_log}")
         raise
 
 if __name__ == "__main__":
     process_files()
+

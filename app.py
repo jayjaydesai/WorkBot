@@ -81,9 +81,14 @@ def download_file(filename):
 @app.route("/run-checkempty", methods=["POST"])
 def run_checkempty():
     try:
+        # Log environment and file upload
+        print("Starting CHECKEMPTY Task...")
+        print(f"Environment Variables: {os.environ}")
+        
         # Check if a file is uploaded
         file = request.files.get("file")
         if not file:
+            print("No file uploaded.")
             return """
             <h2>Error: No file uploaded.</h2>
             <br><a href="/" style="text-decoration:none; padding:10px; background-color:red; color:white; border-radius:5px;">Back to Home</a>
@@ -94,6 +99,7 @@ def run_checkempty():
         os.makedirs(upload_folder, exist_ok=True)  # Ensure the folder exists
         file_path = os.path.join(upload_folder, "BULK.xlsx")
         file.save(file_path)
+        print(f"Uploaded BULK.xlsx saved to: {file_path}")
 
         # Run the scripts
         scripts = ["OUTPUT11.py", "OUTPUT12.py", "OUTPUT13.py"]
@@ -101,9 +107,17 @@ def run_checkempty():
 
         for script in scripts:
             script_path = os.path.join(base_path, script)
-            subprocess.run(["python", script_path], capture_output=True, text=True, check=True)
+            print(f"Running script: {script_path}")
+            result = subprocess.run(
+                ["python", script_path],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            print(f"Output from {script}: {result.stdout}")
 
         # Return a success message with the download link
+        print("CHECKEMPTY Task completed successfully.")
         return f"""
         <h2>Request Processed Successfully</h2>
         <ul>
@@ -111,8 +125,15 @@ def run_checkempty():
         </ul>
         <br><a href="/" style="text-decoration:none; padding:10px; background-color:blue; color:white; border-radius:5px;">Back to Home</a>
         """
+    except subprocess.CalledProcessError as e:
+        print(f"Subprocess error while running scripts: {e.stderr}")
+        return f"""
+        <h2>Error during script execution:</h2>
+        <pre>{e.stderr}</pre>
+        <br><a href="/" style="text-decoration:none; padding:10px; background-color:red; color:white; border-radius:5px;">Back to Home</a>
+        """
     except Exception as e:
-        # Handle unexpected errors
+        print(f"Unexpected error: {str(e)}")
         return f"""
         <h2>An unexpected error occurred:</h2>
         <pre>{str(e)}</pre>
