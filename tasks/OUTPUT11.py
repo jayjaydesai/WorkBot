@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from pathlib import Path
+import sys
 
 def get_bulk_file(upload_folder):
     """Get the BULK.xlsx file from the uploads folder."""
@@ -12,6 +13,10 @@ def get_bulk_file(upload_folder):
 
 def process_files():
     try:
+        # Log environment details
+        print(f"Current working directory: {Path.cwd()}")
+        print(f"Python version: {sys.version}")
+
         # Set base_path dynamically
         base_path = Path(__file__).resolve().parent.parent
 
@@ -31,15 +36,24 @@ def process_files():
 
         # Validate input files
         a16_path = locations_folder / "A16.xlsx"
+        print(f"A16.xlsx exists: {a16_path.exists()}")
+        bulk_path = get_bulk_file(uploads_folder)
+
         if not a16_path.exists():
             raise FileNotFoundError(f"A16.xlsx not found in locations folder: {a16_path}")
-        bulk_path = get_bulk_file(uploads_folder)
 
         # Load Excel files
         print("Loading A16.xlsx...")
-        a16_df = pd.read_excel(a16_path)
+        try:
+            a16_df = pd.read_excel(a16_path)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load A16.xlsx: {e}")
+
         print("Loading BULK.xlsx...")
-        bulk_df = pd.read_excel(bulk_path)
+        try:
+            bulk_df = pd.read_excel(bulk_path)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load BULK.xlsx: {e}")
 
         # Debugging: Print dataframes' shapes
         print(f"A16.xlsx shape: {a16_df.shape}")
@@ -47,17 +61,23 @@ def process_files():
 
         # Merge dataframes
         print("Merging dataframes...")
-        merged_df = pd.merge(
-            a16_df.drop(columns=['Licence plate']),  # Drop Licence plate column from A16
-            bulk_df[['Location', 'Licence plate']],  # Only keep Location and Licence plate from BULK
-            on='Location',
-            how='left'
-        )
+        try:
+            merged_df = pd.merge(
+                a16_df.drop(columns=['Licence plate']),  # Drop Licence plate column from A16
+                bulk_df[['Location', 'Licence plate']],  # Only keep Location and Licence plate from BULK
+                on='Location',
+                how='left'
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to merge dataframes: {e}")
 
         # Save output file
         output_file = output_folder / "OUTPUT11.xlsx"
         print(f"Saving output to: {output_file}")
-        merged_df.to_excel(output_file, index=False)
+        try:
+            merged_df.to_excel(output_file, index=False)
+        except Exception as e:
+            raise RuntimeError(f"Failed to save OUTPUT11.xlsx: {e}")
 
         print("Processing completed successfully.")
     except Exception as e:
