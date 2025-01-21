@@ -1,13 +1,12 @@
 import os
 from pathlib import Path
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment, PatternFill, Font
-from openpyxl.utils import get_column_letter
 
 
 def create_output5(output_folder):
     """
-    Update "Replen Status" based on "Stock" > 0, preserve formatting from OUTPUT4.xlsx, and save as OUTPUT5.xlsx.
+    Update "Replen Status" based on "Stock" > 0 and save as OUTPUT5.xlsx.
+    Preserve only essential header capitalization.
 
     Args:
         output_folder (str): Path to the folder containing OUTPUT4.xlsx.
@@ -37,9 +36,9 @@ def create_output5(output_folder):
         replen_status_col = None
 
         for col in ws.iter_cols(1, ws.max_column):
-            if col[0].value == "Stock":
+            if col[0].value and col[0].value.lower() == "stock":
                 stock_col = col[0].column
-            if col[0].value == "Replen Status":
+            if col[0].value and col[0].value.lower() == "replen status":
                 replen_status_col = col[0].column
 
         if stock_col is None or replen_status_col is None:
@@ -52,29 +51,10 @@ def create_output5(output_folder):
             if stock_value is not None and stock_value > 0:
                 ws.cell(row=row, column=replen_status_col).value = "Replen Required"
 
-        # Format the headers
-        header_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")  # Dark blue
-        header_font = Font(color="FFFF00", bold=True)  # Yellow and bold
-        center_alignment = Alignment(horizontal="center", vertical="center")
-
+        # Capitalize first letter of every word in column headers
         for cell in ws[1]:  # First row (headers)
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = center_alignment
-
-        # Center align all cells and adjust column widths
-        print("Adjusting column widths and alignments...")
-        for col in ws.columns:
-            max_length = 0
-            col_letter = get_column_letter(col[0].column)
-            for cell in col:
-                if cell.value:
-                    max_length = max(max_length, len(str(cell.value)))
-                cell.alignment = center_alignment
-            ws.column_dimensions[col_letter].width = max_length + 2
-
-        # Freeze first row and first column
-        ws.freeze_panes = "B2"
+            if cell.value:
+                cell.value = cell.value.title()
 
         # Save to OUTPUT5.xlsx
         print(f"Saving OUTPUT5.xlsx to: {output5_file}")

@@ -1,14 +1,12 @@
 import os
 from pathlib import Path
 from openpyxl import load_workbook, Workbook
-from openpyxl.styles import Alignment, PatternFill, Font
-from openpyxl.utils import get_column_letter
 
 
 def create_output6(output_folder):
     """
     Remove rows where "Replen Status" is "Replen not Required" from OUTPUT5.xlsx,
-    keeping the header row, and save the result as OUTPUT6.xlsx with preserved formatting.
+    keeping the header row, and save the result as OUTPUT6.xlsx.
 
     Args:
         output_folder (str): Path to the folder containing OUTPUT5.xlsx.
@@ -33,9 +31,9 @@ def create_output6(output_folder):
         wb = load_workbook(output5_file)
         ws = wb.active
 
-        # Read all rows into memory
+        # Read rows into memory
         rows = list(ws.iter_rows(values_only=True))
-        header = rows[0]  # Extract the header row
+        header = rows[0]  # Extract header row
 
         # Ensure "Replen Status" exists in the header
         if "Replen Status" not in header:
@@ -50,31 +48,14 @@ def create_output6(output_folder):
         new_ws = new_wb.active
 
         # Write header and filtered rows to the new worksheet
-        new_ws.append(header)  # Write the header row
+        new_ws.append(header)  # Write header row
         for row in filtered_rows:
             new_ws.append(row)
 
-        # Formatting
-        print("Applying formatting to OUTPUT6.xlsx...")
-        # Apply formatting for the header
-        header_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")  # Dark Blue
-        header_font = Font(color="FFFF00", bold=True)  # Yellow font
-        alignment = Alignment(horizontal="center", vertical="center")
-
-        for col, cell in enumerate(new_ws[1], start=1):
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = alignment
-            col_letter = get_column_letter(col)
-            new_ws.column_dimensions[col_letter].width = max(len(str(cell.value or "")) + 2, 12)
-
-        # Apply center alignment to all data rows
-        for row in new_ws.iter_rows(min_row=2, max_row=new_ws.max_row):
-            for cell in row:
-                cell.alignment = alignment
-
-        # Freeze the first row and column
-        new_ws.freeze_panes = "B2"
+        # Capitalize the first letter of every word in the header
+        for cell in new_ws[1]:  # First row (header row)
+            if cell.value:
+                cell.value = cell.value.title()
 
         # Save the new workbook as OUTPUT6.xlsx
         print(f"Saving OUTPUT6.xlsx to: {output6_file}")
@@ -99,3 +80,4 @@ if __name__ == "__main__":
 
     # Run the function
     create_output6(output_folder)
+
