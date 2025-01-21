@@ -17,7 +17,7 @@ def main():
         return
 
     # List all the scripts to be executed in order
-    scripts_to_run = [f"OUTPUT{i}.py" for i in range(1, 29)]
+    scripts_to_run = [f"OUTPUT{i}.py" for i in range(16, 29)]
 
     # Execute each script in order
     for script in scripts_to_run:

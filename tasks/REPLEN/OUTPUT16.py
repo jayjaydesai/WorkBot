@@ -1,109 +1,179 @@
 import os
-from pathlib import Path
 import pandas as pd
+from pathlib import Path
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, PatternFill, Font
 from openpyxl.utils import get_column_letter
 
 
-def create_output16(input_file, output_file):
+def create_combined_output16(upload_folder, output_folder):
     """
-    Add a calculated "Ratio" column to OUTPUT15.xlsx and save as OUTPUT16.xlsx.
-    The "Ratio" column is calculated as the % of "Posted Quantity" of "Stock For Replen".
+    Combine the functionality of REPLENOUTPUT15 and OUTPUT16:
+    - Merge BULK.xlsx, AS01011.xlsx, COVERAGE.xlsx, and optionally EXPORT.xlsx.
+    - Add calculated columns for replenishment.
+    - Update "Replen Status" based on "Stock" > 0.
+    - Filter rows based on conditions for "Replen Status," "Stock Status," "Location," and "Ugly."
+    - Add "Total Posted Qty" column grouped by "Item Number."
+    - Add "Number of Item Number" column.
+    - Add "Diff2," "% Required of Posted Qty," "Stock For Replen," "Decision," and "Pallet Qty-Replen Stock" columns.
+    - Add "Ratio" column as the percentage of "Posted Quantity" over "Stock For Replen."
+    - Save the final result as OUTPUT16.xlsx.
 
     Args:
-        input_file (str): Path to the input Excel file (OUTPUT15.xlsx).
-        output_file (str): Path to save the processed Excel file (OUTPUT16.xlsx).
+        upload_folder (str): Path to the folder containing input files.
+        output_folder (str): Path to save the final output file.
     """
     try:
-        # Resolve paths dynamically for compatibility
-        input_file = Path(input_file).resolve()
-        output_file = Path(output_file).resolve()
-        print(f"Resolved input file: {input_file}")
-        print(f"Resolved output file: {output_file}")
+        # Resolve paths
+        upload_folder = Path(upload_folder).resolve()
+        output_folder = Path(output_folder).resolve()
 
-        # Validate input file existence
-        if not input_file.exists():
-            raise FileNotFoundError(f"Input file not found: {input_file}")
+        print(f"Resolved upload folder: {upload_folder}")
+        print(f"Resolved output folder: {output_folder}")
 
-        # Load the Excel file into a DataFrame
-        print("Loading input file...")
-        df = pd.read_excel(input_file)
+        # Ensure output folder exists
+        output_folder.mkdir(parents=True, exist_ok=True)
 
-        # Ensure required columns exist
-        required_columns = ["Posted Quantity", "Stock For Replen"]
-        for col in required_columns:
-            if col not in df.columns:
-                raise ValueError(f"Missing required column: {col}")
+        # Define required and optional files
+        required_files = {
+            "bulk_file": "BULK.xlsx",
+            "as_file": "AS01011.xlsx",
+            "coverage_file": "COVERAGE.xlsx",
+        }
+        optional_file = "EXPORT.xlsx"
 
-        # Add the "Ratio" column
+        # Check required files
+        missing_files = [
+            filename for key, filename in required_files.items()
+            if not (upload_folder / filename).exists()
+        ]
+        if missing_files:
+            raise FileNotFoundError(f"Missing required files: {', '.join(missing_files)}")
+
+        # Load BULK.xlsx
+        print("Loading BULK.xlsx...")
+        bulk_df = pd.read_excel(upload_folder / required_files["bulk_file"])
+        bulk_df.columns = bulk_df.columns.str.lower().str.strip()
+
+        # Load AS01011.xlsx
+        print("Loading AS01011.xlsx...")
+        as_df = pd.read_excel(upload_folder / required_files["as_file"], usecols=["Item number", "Available physical"])
+        as_df.columns = as_df.columns.str.lower().str.strip()
+        as_df["available physical"] = as_df["available physical"].fillna(0)
+
+        # Load COVERAGE.xlsx
+        print("Loading COVERAGE.xlsx...")
+        coverage_df = pd.read_excel(upload_folder / required_files["coverage_file"])
+        coverage_df.columns = coverage_df.columns.str.lower().str.strip()
+
+        # Merge BULK.xlsx with COVERAGE.xlsx on "item number"
+        print("Merging BULK.xlsx and COVERAGE.xlsx...")
+        merged_df = pd.merge(bulk_df, coverage_df, on="item number", how="left")
+
+        # Merge the result with AS01011.xlsx on "item number"
+        print("Merging with AS01011.xlsx...")
+        merged_df = pd.merge(merged_df, as_df, on="item number", how="left")
+
+        # Load EXPORT.xlsx if available
+        export_file = upload_folder / optional_file
+        if export_file.exists():
+            print("Loading EXPORT.xlsx...")
+            export_df = pd.read_excel(export_file, usecols=["Item Number", "Stock"])
+            export_df.columns = export_df.columns.str.lower().str.strip()
+            print("Merging with EXPORT.xlsx...")
+            merged_df = pd.merge(merged_df, export_df, on="item number", how="left")
+        else:
+            print(f"Warning: {optional_file} not found. Proceeding without it.")
+            merged_df["stock"] = None  # Add a "stock" column with empty values if EXPORT.xlsx is missing
+
+        # Replace blank "Available Physical" with 0
+        print("Replacing blank 'Available Physical' with 0...")
+        merged_df["available physical"] = merged_df["available physical"].fillna(0)
+
+        # Add calculated columns
+        print("Adding calculated columns...")
+        merged_df["rmin - available physical"] = merged_df["rmin"] - merged_df["available physical"]
+        merged_df["replen status"] = merged_df["rmin - available physical"].apply(
+            lambda x: "Replen Required" if x > 0 else "Replen not Required"
+        )
+        merged_df["difference"] = merged_df["rcoverage"] - merged_df["available physical"]
+
+        # Update "Replen Status" based on "Stock"
+        print("Updating 'Replen Status' based on 'Stock' > 0...")
+        merged_df["replen status"] = merged_df.apply(
+            lambda row: "Replen Required" if row["stock"] > 0 else row["replen status"], axis=1
+        )
+
+        # Filter rows
+        print("Filtering rows...")
+        filtered_df = merged_df[
+            (merged_df["replen status"] != "Replen not Required") &
+            (merged_df["stock status"] != "Available") &
+            (merged_df["location"] != "AS Replens") &
+            ~((merged_df["ugly"] == "UGLY") & ((merged_df["stock"].isna()) | (merged_df["stock"] <= 0)))
+        ]
+
+        # Add "Total Posted Qty" column
+        filtered_df["total posted qty"] = filtered_df.groupby("item number")["posted quantity"].transform("sum")
+
+        # Add "Number of Item Number" column
+        filtered_df["number of item number"] = filtered_df["item number"].map(filtered_df["item number"].value_counts())
+
+        # Add "Diff2" and "% Required of Posted Qty" columns
+        filtered_df["diff2"] = filtered_df["total posted qty"] - filtered_df["difference"]
+        filtered_df["% required of posted qty"] = (
+            (filtered_df["difference"] / filtered_df["total posted qty"]) * 100
+        ).fillna(0).round(2).astype(str) + "%"
+
+        # Add "Stock For Replen" column
+        print("Calculating 'Stock For Replen' column...")
+        filtered_df["stock for replen"] = filtered_df.apply(
+            lambda row: row["total posted qty"] if row["diff2"] <= 11 else row["difference"], axis=1
+        )
+        filtered_df["stock for replen"] += filtered_df["stock"].fillna(0)
+
+        # Add "Decision" column
+        print("Adding 'Decision' column...")
+        filtered_df["decision"] = filtered_df["number of item number"].apply(
+            lambda x: "Good to Go" if x == 1 else ""
+        )
+
+        # Add "Pallet Qty-Replen Stock" column
+        print("Adding 'Pallet Qty-Replen Stock' column...")
+        filtered_df["pallet qty-replen stock"] = filtered_df["posted quantity"] - filtered_df["stock for replen"]
+
+        # Add "Ratio" column
         print("Adding 'Ratio' column...")
-        df["Ratio"] = (df["Posted Quantity"] / df["Stock For Replen"].replace(0, pd.NA)) * 100
-        df["Ratio"] = df["Ratio"].fillna(0).round(2)  # Replace NaN with 0 and round to 2 decimal places
+        filtered_df["ratio"] = (filtered_df["posted quantity"] / filtered_df["stock for replen"].replace(0, pd.NA)) * 100
+        filtered_df["ratio"] = filtered_df["ratio"].fillna(0).round(2)
 
-        # Save the result to an Excel file with formatting
-        print("Saving to OUTPUT16.xlsx...")
-        save_with_formatting(df, output_file)
-        print(f"OUTPUT16.xlsx created and saved at {output_file}")
+        # Capitalize column headers
+        filtered_df.columns = filtered_df.columns.str.title()
+
+        # Save to OUTPUT16.xlsx
+        output16_file = output_folder / "OUTPUT16.xlsx"
+        print(f"Saving OUTPUT16.xlsx to: {output16_file}")
+        filtered_df.to_excel(output16_file, index=False)
+
+        print(f"OUTPUT16.xlsx created successfully at {output16_file}")
+        return output16_file
 
     except FileNotFoundError as e:
-        print(f"File Not Found Error: {e}")
+        print(f"File Not Found Error: {str(e)}")
         raise
     except ValueError as e:
-        print(f"Value Error: {e}")
+        print(f"Value Error: {str(e)}")
         raise
     except Exception as e:
         print(f"Error occurred while processing: {e}")
         raise
 
 
-def save_with_formatting(df, output_file):
-    """
-    Save the DataFrame to an Excel file with formatting.
-
-    Args:
-        df (pd.DataFrame): DataFrame to save.
-        output_file (str): Path to save the formatted Excel file.
-    """
-    # Save DataFrame to Excel
-    df.to_excel(output_file, index=False)
-
-    # Load the saved workbook
-    wb = load_workbook(output_file)
-    sheet = wb.active
-
-    # Freeze the first row and column
-    sheet.freeze_panes = sheet["B2"]
-
-    # Styling for column headings
-    heading_font = Font(bold=True, color="FFFF00")  # Yellow font
-    heading_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")  # Dark blue background
-    alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    # Format the first row (Column Headings)
-    for col_num, cell in enumerate(sheet[1], start=1):
-        cell.value = cell.value.title()  # Capitalize each word in the header
-        cell.font = heading_font
-        cell.fill = heading_fill
-        cell.alignment = alignment
-        # Adjust column width based on content
-        max_length = max((len(str(cell.value or "")) for cell in sheet[get_column_letter(col_num)]), default=0)
-        sheet.column_dimensions[get_column_letter(col_num)].width = max(max_length + 2, 15)
-
-    # Apply alignment to all data cells
-    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
-        for cell in row:
-            cell.alignment = alignment
-
-    # Save the formatted file
-    wb.save(output_file)
-
-
 if __name__ == "__main__":
-    # Dynamically resolve paths for compatibility
-    base_path = Path(__file__).resolve().parent.parent.parent
-    input_file = base_path / "output" / "REPLEN" / "OUTPUT15.xlsx"
-    output_file = base_path / "output" / "REPLEN" / "OUTPUT16.xlsx"
+    # Dynamically resolve paths
+    base_path = Path(__file__).resolve().parents[2]
+    upload_folder = base_path / "uploads" / "REPLEN"
+    output_folder = base_path / "output" / "REPLEN"
 
-    # Run the function
-    create_output16(input_file, output_file)
+    # Run the combined script
+    create_combined_output16(upload_folder, output_folder)
