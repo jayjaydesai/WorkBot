@@ -1,63 +1,112 @@
-import pandas as pd
 import os
+import pandas as pd
+from pathlib import Path
+from openpyxl import load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
-# Define file paths
-output2_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT2.xlsx"
-pick_location_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\2-SOURCE_FILES\PICK_LOCATION.xlsx"
-as_replen_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\2-SOURCE_FILES\AS_REPLEN.xlsx"
-output3_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT3.xlsx"
 
-# Load the data
-output2_df = pd.read_excel(output2_path)
-pick_location_df = pd.read_excel(pick_location_path)
-as_replen_df = pd.read_excel(as_replen_path)
+def create_output3(output_folder):
+    """
+    Process OUTPUT2.xlsx to add calculated columns and save as OUTPUT3.xlsx.
 
-# Normalize column names (strip spaces and convert to lowercase for consistency)
-output2_df.columns = output2_df.columns.str.strip().str.lower()
-pick_location_df.columns = pick_location_df.columns.str.strip().str.lower()
-as_replen_df.columns = as_replen_df.columns.str.strip().str.lower()
+    Args:
+        output_folder (str): Path to save the output file.
+    """
+    try:
+        # Resolve paths dynamically
+        output_folder = Path(output_folder).resolve()
 
-# Ensure case-insensitive matching by converting 'item number' to lowercase for matching
-output2_df['item number'] = output2_df['item number'].astype(str).str.lower()
-pick_location_df['item number'] = pick_location_df['item number'].astype(str).str.lower()
-as_replen_df['item number'] = as_replen_df['item number'].astype(str).str.lower()
+        # Debugging: Print resolved paths
+        print(f"Resolved output folder: {output_folder}")
 
-# Select required columns from PICK_LOCATION and AS_REPLEN
-pick_location_subset = pick_location_df[['item number', 'location']]
-as_replen_subset = as_replen_df[['item number']].rename(columns={'item number': 'as replen number'})
+        # Ensure folders exist
+        if not output_folder.exists():
+            raise FileNotFoundError(f"Output folder does not exist: {output_folder}")
 
-# Merge OUTPUT2 and PICK_LOCATION based on 'item number'
-merged_df = pd.merge(output2_df, pick_location_subset, on='item number', how='left')
+        # File paths
+        output2_file = output_folder / "OUTPUT2.xlsx"
+        output3_file = output_folder / "OUTPUT3.xlsx"
 
-# Debugging: Print column names before the next merge
-print("Columns in merged_df before merging AS_REPLEN:", merged_df.columns.tolist())
-print("Columns in as_replen_subset:", as_replen_subset.columns.tolist())
+        # Check if required file exists
+        if not output2_file.exists():
+            raise FileNotFoundError(f"Required file not found: {output2_file}")
 
-# Add a new column 'LEVEL' based on the last character of 'LOCATION_X'
-location_column = 'location_x' if 'location_x' in merged_df.columns else 'location'
-if location_column in merged_df.columns:
-    merged_df['level'] = merged_df[location_column].astype(str).str[-1]
-else:
-    raise KeyError(f"'{location_column}' column is missing in the merged dataframe.")
+        # Load OUTPUT2.xlsx
+        print("Loading OUTPUT2.xlsx...")
+        output2_df = pd.read_excel(output2_file)
 
-# Ensure consistent column naming for merge
-merged_df.rename(columns={'item number': 'item number'}, inplace=True)
+        # Ensure case-insensitive column names
+        output2_df.columns = output2_df.columns.str.lower().str.strip()
 
-# Merge with AS_REPLEN to add 'AS REPLEN NUMBER'
-merged_df = pd.merge(merged_df, as_replen_subset, left_on='item number', right_on='as replen number', how='left')
+        # Add "Rmin - Available Physical" column
+        print("Adding calculated columns...")
+        output2_df["rmin - available physical"] = output2_df["rmin"] - output2_df["available physical"]
 
-# Convert all relevant columns to uppercase, including 'ITEM NUMBER' and 'AS REPLEN NUMBER'
-columns_to_uppercase = ['item number', 'as replen number', 'location', 'location_x']
-for col in columns_to_uppercase:
-    if col in merged_df.columns:
-        merged_df[col] = merged_df[col].astype(str).str.upper()
+        # Add "Replen Status" column
+        output2_df["replen status"] = output2_df["rmin - available physical"].apply(
+            lambda x: "Replen Required" if x > 0 else "Replen not Required"
+        )
 
-# Convert all column headings to uppercase
-merged_df.columns = merged_df.columns.str.upper()
+        # Save to OUTPUT3.xlsx
+        print(f"Saving OUTPUT3.xlsx to: {output3_file}")
+        output2_df.to_excel(output3_file, index=False)
 
-# Save the final merged file
-if not os.path.exists(os.path.dirname(output3_path)):
-    os.makedirs(os.path.dirname(output3_path))  # Create the output folder if it doesn't exist
+        # Apply formatting
+        apply_formatting(output3_file)
+        print(f"OUTPUT3.xlsx created and formatted successfully at {output3_file}")
 
-merged_df.to_excel(output3_path, index=False)
-print(f"Merged file saved at: {output3_path}")
+        return output3_file
+
+    except FileNotFoundError as e:
+        print(f"File Not Found Error: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Error occurred while processing: {e}")
+        raise
+
+
+def apply_formatting(output_file):
+    """
+    Apply formatting to the Excel file (OUTPUT3.xlsx).
+
+    Args:
+        output_file (str): Path to the Excel file to format.
+    """
+    wb = load_workbook(output_file)
+    sheet = wb.active
+
+    # Freeze the first row and column
+    sheet.freeze_panes = sheet["B2"]
+
+    # Styling for column headings
+    heading_font = Font(bold=True, color="FFFF00")  # Yellow font
+    heading_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")  # Dark blue background
+    alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Format the first row (Column Headings)
+    for col_num, cell in enumerate(sheet[1], start=1):
+        cell.value = cell.value.title()  # Capitalize each word in the header
+        cell.font = heading_font
+        cell.fill = heading_fill
+        cell.alignment = alignment
+        # Adjust column width based on content
+        max_length = max((len(str(cell.value or "")) for cell in sheet[get_column_letter(col_num)]), default=0)
+        sheet.column_dimensions[get_column_letter(col_num)].width = max(max_length + 2, 15)
+
+    # Apply alignment to all data cells
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
+        for cell in row:
+            cell.alignment = alignment
+
+    # Save the formatted file
+    wb.save(output_file)
+
+
+if __name__ == "__main__":
+    # Dynamically determine paths
+    base_path = Path(__file__).resolve().parents[2]  # Go up two levels from this script's location
+    output_folder = base_path / "output" / "REPLEN"
+
+    # Run the function
+    create_output3(output_folder)

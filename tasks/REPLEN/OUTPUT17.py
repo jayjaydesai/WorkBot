@@ -1,84 +1,117 @@
+import os
+from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
-import os
+from openpyxl.utils import get_column_letter
 
-# Define file paths
-output16_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT16.xlsx"
-output17_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT17.xlsx"
 
-# Load the OUTPUT16 file
-output16_df = pd.read_excel(output16_path)
+def create_output17(input_file, output_file):
+    """
+    Update the "Decision" column in OUTPUT16.xlsx based on the "Ratio" column and specific criteria.
 
-# Normalize column names
-output16_df.columns = output16_df.columns.str.strip().str.upper()
+    Args:
+        input_file (str): Path to the input Excel file (OUTPUT16.xlsx).
+        output_file (str): Path to save the processed Excel file (OUTPUT17.xlsx).
+    """
+    try:
+        # Resolve paths dynamically for compatibility
+        input_file = Path(input_file).resolve()
+        output_file = Path(output_file).resolve()
+        print(f"Resolved input file: {input_file}")
+        print(f"Resolved output file: {output_file}")
 
-# Step 1: Define column mappings for potential spelling differences
-column_mappings = {
-    "LICENSE PLATE": "LICENCE PLATE"  # Map to actual column names in the file
-}
+        # Validate input file existence
+        if not input_file.exists():
+            raise FileNotFoundError(f"Input file not found: {input_file}")
 
-# Replace requested column names with actual column names if needed
-selected_columns = [
-    'ITEM NUMBER', 'LOCATION_X', 'LOCATION_Y', 'STOCK STATUS', 'LICENSE PLATE', 
-    'POSTED QUANTITY', 'SUB RANGE', 'BRAND', 'LEVEL', 'FINAL STOCK FOR REPLEN', 
-    'LEVEL STATUS', 'SHORTAGE OF STOCK TO FULLY REPLEN'
-]
-adjusted_columns = [column_mappings.get(col, col) for col in selected_columns]
+        # Load the Excel file into a DataFrame
+        print("Loading input file...")
+        df = pd.read_excel(input_file)
 
-# Step 2: Check for missing columns and adjust
-missing_columns = [col for col in adjusted_columns if col not in output16_df.columns]
-if missing_columns:
-    print(f"Warning: The following columns are missing and will be excluded: {missing_columns}")
-    adjusted_columns = [col for col in adjusted_columns if col not in missing_columns]
+        # Check for missing columns
+        required_columns = ["Decision", "Ratio", "Item Number"]
+        for col in required_columns:
+            if col not in df.columns:
+                raise ValueError(f"Missing required column: {col}")
 
-# Step 3: Create the OUTPUT17 DataFrame with only the adjusted columns
-output17_df = output16_df[adjusted_columns]
+        # Group rows by "Item Number" where "Decision" is blank
+        grouped = df[df["Decision"].isna()].groupby("Item Number")
 
-# Step 4: Sort by "LEVEL STATUS" in A-to-Z order
-if "LEVEL STATUS" in output17_df.columns:
-    output17_df = output17_df.sort_values(by="LEVEL STATUS", ascending=True)
+        for item_number, group in grouped:
+            ratios = group["Ratio"]
+            if all(ratios < 100):  # All ratios under 100
+                max_ratio_index = group["Ratio"].idxmax()
+                df.loc[max_ratio_index, "Decision"] = "Good to Go"
+                df.loc[group.index.difference([max_ratio_index]), "Decision"] = "Not to Use"
+            elif all(ratios > 100):  # All ratios above 100
+                min_ratio_index = group["Ratio"].idxmin()
+                df.loc[min_ratio_index, "Decision"] = "Good to Go"
+                df.loc[group.index.difference([min_ratio_index]), "Decision"] = "Not to Use"
 
-# Step 5: Save the selected and sorted columns to OUTPUT17.xlsx
-output17_df.to_excel(output17_path, index=False)
+        # Save the result to an Excel file with formatting
+        print("Saving to OUTPUT17.xlsx...")
+        save_with_formatting(df, output_file)
+        print(f"OUTPUT17.xlsx created and saved at {output_file}")
 
-# Step 6: Adjust formatting: Freeze header row, add header style, center-align text
-try:
-    wb = load_workbook(output17_path)
-    ws = wb.active
+    except FileNotFoundError as e:
+        print(f"File Not Found Error: {e}")
+        raise
+    except ValueError as e:
+        print(f"Value Error: {e}")
+        raise
+    except Exception as e:
+        print(f"Error occurred while processing: {e}")
+        raise
 
-    # Freeze the first row (header)
-    ws.freeze_panes = "A2"
 
-    # Apply styles to the header row
-    header_fill = PatternFill(start_color="000080", end_color="000080", fill_type="solid")  # Navy Dark Blue background
-    header_font = Font(color="FFFF00", bold=True)  # Yellow font, bold
-    for cell in ws[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal='center', vertical='center')
+def save_with_formatting(df, output_file):
+    """
+    Save the DataFrame to an Excel file with formatting.
 
-    # Adjust column widths based on content
-    for col in ws.columns:
-        max_length = 0
-        col_letter = col[0].column_letter  # Get column letter (e.g., A, B, C)
-        for cell in col:
-            try:
-                if cell.value:  # Only consider non-empty cells
-                    max_length = max(max_length, len(str(cell.value)))
-            except:
-                pass
-        adjusted_width = max_length + 2  # Add some padding
-        ws.column_dimensions[col_letter].width = adjusted_width
+    Args:
+        df (pd.DataFrame): DataFrame to save.
+        output_file (str): Path to save the formatted Excel file.
+    """
+    # Save DataFrame to Excel
+    df.to_excel(output_file, index=False)
 
-    # Center-align all data cells
-    for row in ws.iter_rows(min_row=2):  # Start from the second row
+    # Load the saved workbook
+    wb = load_workbook(output_file)
+    sheet = wb.active
+
+    # Freeze the first row and column
+    sheet.freeze_panes = sheet["B2"]
+
+    # Styling for column headings
+    heading_font = Font(bold=True, color="FFFF00")  # Yellow font
+    heading_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")  # Dark blue background
+    alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Format the first row (Column Headings)
+    for col_num, cell in enumerate(sheet[1], start=1):
+        cell.value = cell.value.title()  # Capitalize each word in the header
+        cell.font = heading_font
+        cell.fill = heading_fill
+        cell.alignment = alignment
+        # Adjust column width based on content
+        max_length = max((len(str(cell.value or "")) for cell in sheet[get_column_letter(col_num)]), default=0)
+        sheet.column_dimensions[get_column_letter(col_num)].width = max(max_length + 2, 15)
+
+    # Apply alignment to all data cells
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
         for cell in row:
-            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.alignment = alignment
 
-    # Save the formatted OUTPUT17 file
-    wb.save(output17_path)
-    print(f"OUTPUT17 file saved with adjusted formatting, freeze panes, and sorting at: {output17_path}")
+    # Save the formatted file
+    wb.save(output_file)
 
-except Exception as e:
-    print(f"An error occurred while formatting OUTPUT17: {e}")
+
+if __name__ == "__main__":
+    # Dynamically resolve paths for compatibility
+    base_path = Path(__file__).resolve().parent.parent.parent
+    input_file = base_path / "output" / "REPLEN" / "OUTPUT16.xlsx"
+    output_file = base_path / "output" / "REPLEN" / "OUTPUT17.xlsx"
+
+    # Run the function
+    create_output17(input_file, output_file)

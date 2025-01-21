@@ -1,84 +1,114 @@
 import pandas as pd
+from pathlib import Path
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
-# Define file paths
-output17_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT17.xlsx"
-a_location_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\FINAL FILES TO SEND TO ROBERT\A_LOCATION_REPLENS.xlsx"
-pallet_stacker_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\FINAL FILES TO SEND TO ROBERT\PALLET_STACKER_REPLENS.xlsx"
-reach_replens_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\FINAL FILES TO SEND TO ROBERT\REACH_REPLENS.xlsx"
 
-# Load the OUTPUT17 file
-output17_df = pd.read_excel(output17_path)
+def create_output18(input_file, output_file):
+    """
+    Update 'Decision' column based on 'Ratio' for cases where
+    all rows for the same Item Number have 'Ratio' above 100.
+    The lowest 'Ratio' in this range will be marked as "Good to Go",
+    and the rest will be marked as "Not to Use".
 
-# Normalize column names
-output17_df.columns = output17_df.columns.str.strip().str.upper()
+    Args:
+        input_file (str): Path to INPUT file (e.g., OUTPUT17.xlsx).
+        output_file (str): Path to OUTPUT file (e.g., OUTPUT18.xlsx).
+    """
+    try:
+        # Resolve paths dynamically for compatibility
+        input_file = Path(input_file).resolve()
+        output_file = Path(output_file).resolve()
+        print(f"Resolved input file: {input_file}")
+        print(f"Resolved output file: {output_file}")
 
-# Step 1: Filter rows for each LEVEL STATUS
-a_location_df = output17_df[output17_df['LEVEL STATUS'] == 'A LOCATION REPLENS'].sort_values(by='LOCATION_X')
-pallet_stacker_df = output17_df[output17_df['LEVEL STATUS'] == 'PALLET STACKER REPLENS'].sort_values(by='LOCATION_X')
-reach_replens_df = output17_df[output17_df['LEVEL STATUS'] == 'REACH REPLENS'].sort_values(by='LOCATION_X')
+        # Validate input file existence
+        if not input_file.exists():
+            raise FileNotFoundError(f"Input file not found: {input_file}")
 
-# Step 2: Function to apply formatting, borders, and save
-def format_and_save(df, file_path):
-    # Save the DataFrame to Excel
-    df.to_excel(file_path, index=False)
+        # Load the data
+        print("Loading input file...")
+        df = pd.read_excel(input_file)
 
-    # Open the workbook for formatting
-    wb = load_workbook(file_path)
-    ws = wb.active
+        # Ensure column names are consistent
+        df.columns = df.columns.str.strip()
 
-    # Freeze the first row (header)
-    ws.freeze_panes = "A2"
+        # Process each Item Number group
+        for item_number, group in df.groupby("Item Number"):
+            blank_rows = group[group["Decision"].isna()]  # Rows with blank "Decision"
 
-    # Apply header formatting: Dark Navy Blue background, Yellow font
-    header_fill = PatternFill(start_color="000080", end_color="000080", fill_type="solid")  # Dark Navy Blue
-    header_font = Font(color="FFFF00", bold=True, size=10)  # Yellow font, bold, smaller size
-    for cell in ws[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal='center', vertical='center')
+            if not blank_rows.empty:
+                ratios = blank_rows["Ratio"].tolist()
 
-    # Add borders to all cells
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin")
-    )
-    for row in ws.iter_rows():
+                # Check if all ratios are above 100 for this Item Number
+                if all(r > 100 for r in ratios):
+                    # Find the row with the lowest Ratio
+                    min_ratio_index = blank_rows["Ratio"].idxmin()
+                    df.loc[min_ratio_index, "Decision"] = "Good to Go"
+
+                    # Mark the rest as "Not to Use"
+                    remaining_rows = blank_rows.drop(index=min_ratio_index)
+                    df.loc[remaining_rows.index, "Decision"] = "Not to Use"
+
+        # Save the updated dataframe
+        print("Saving output file...")
+        df.to_excel(output_file, index=False)
+
+        # Apply formatting
+        apply_formatting(output_file)
+        print(f"OUTPUT18.xlsx created and formatted at {output_file}")
+
+    except FileNotFoundError as e:
+        print(f"File Not Found Error: {e}")
+        raise
+    except Exception as e:
+        print(f"Error occurred while processing: {e}")
+        raise
+
+
+def apply_formatting(output_file):
+    """
+    Apply formatting to the Excel file (OUTPUT18.xlsx).
+
+    Args:
+        output_file (str): Path to the Excel file to format.
+    """
+    wb = load_workbook(output_file)
+    sheet = wb.active
+
+    # Freeze the first row and column
+    sheet.freeze_panes = sheet["B2"]
+
+    # Styling for column headings
+    heading_font = Font(bold=True, color="FFFF00")  # Yellow font
+    heading_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")  # Dark blue background
+    alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Format the first row (Column Headings)
+    for col_num, cell in enumerate(sheet[1], start=1):
+        cell.value = cell.value.title()  # Capitalize each word in the header
+        cell.font = heading_font
+        cell.fill = heading_fill
+        cell.alignment = alignment
+        # Adjust column width based on content
+        max_length = max((len(str(cell.value or "")) for cell in sheet[get_column_letter(col_num)]), default=0)
+        sheet.column_dimensions[get_column_letter(col_num)].width = max(max_length + 2, 15)
+
+    # Apply alignment to all data cells
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
         for cell in row:
-            cell.border = thin_border
+            cell.alignment = alignment
 
-    # Adjust column widths dynamically to fit content
-    for col in ws.columns:
-        max_length = 0
-        col_letter = col[0].column_letter  # Get column letter (e.g., A, B, C)
-        for cell in col:
-            try:
-                if cell.value:
-                    max_length = max(max_length, len(str(cell.value)))
-            except:
-                pass
-        ws.column_dimensions[col_letter].width = max_length + 2  # Add padding for readability
+    # Save the formatted file
+    wb.save(output_file)
 
-    # Center-align all data cells and reduce font size for better fit
-    for row in ws.iter_rows(min_row=2):  # Start from the second row
-        for cell in row:
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-            cell.font = Font(size=10)  # Reduce font size for better fit
 
-    # Set page layout to landscape and fit to A4 paper
-    ws.page_setup.orientation = 'landscape'
-    ws.page_setup.paperSize = ws.PAPERSIZE_A4
-    ws.page_setup.fitToWidth = 1
-    ws.page_setup.fitToHeight = 0
+if __name__ == "__main__":
+    # Dynamically resolve paths for compatibility
+    base_path = Path(__file__).resolve().parent.parent.parent
+    input_file = base_path / "output" / "REPLEN" / "OUTPUT17.xlsx"
+    output_file = base_path / "output" / "REPLEN" / "OUTPUT18.xlsx"
 
-    # Save the formatted workbook
-    wb.save(file_path)
-    print(f"File saved and formatted at: {file_path}")
-
-# Step 3: Apply formatting, borders, and save all three files
-format_and_save(a_location_df, a_location_path)
-format_and_save(pallet_stacker_df, pallet_stacker_path)
-format_and_save(reach_replens_df, reach_replens_path)
+    # Run the function
+    create_output18(input_file, output_file)

@@ -5,16 +5,14 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 
-def create_output19(input_file, output_file):
+def create_output23(input_file, output_file):
     """
-    Update 'Decision' column for each Item Number group based on the 'Ratio' column.
-    - If the nearest number to 100 is above 60, mark it as "Good to Go".
-    - If the nearest number to 100 is below 60, mark the highest ratio row as "Good to Go".
-    - Mark remaining rows for the same Item Number as "Not to Use".
+    Add "Priority Status" column to OUTPUT22.xlsx based on "Rsubrange" and "Priority Ratio".
+    Save the updated file as OUTPUT23.xlsx.
 
     Args:
-        input_file (str): Path to the input file (e.g., OUTPUT18.xlsx).
-        output_file (str): Path to save the output file (e.g., OUTPUT19.xlsx).
+        input_file (str): Path to the input file (e.g., OUTPUT22.xlsx).
+        output_file (str): Path to save the output file (e.g., OUTPUT23.xlsx).
     """
     try:
         # Resolve paths dynamically for compatibility
@@ -34,26 +32,37 @@ def create_output19(input_file, output_file):
         # Ensure column names are consistent
         df.columns = df.columns.str.strip()
 
-        # Iterate through each Item Number group
-        for item_number, group in df.groupby("Item Number"):
-            blank_rows = group[group["Decision"].isna()]  # Rows with blank "Decision"
+        # Validate required columns
+        required_columns = ["Rsubrange", "Priority Ratio"]
+        for col in required_columns:
+            if col not in df.columns:
+                raise ValueError(f"Missing required column: {col}")
 
-            if not blank_rows.empty:
-                # Find the nearest Ratio to 100
-                closest_to_100_index = (blank_rows["Ratio"] - 100).abs().idxmin()
-                closest_to_100_value = blank_rows.loc[closest_to_100_index, "Ratio"]
+        # Function to calculate Priority Status
+        def calculate_priority_status(row):
+            rsubrange = row["Rsubrange"]
+            priority_ratio = row["Priority Ratio"]
 
-                if closest_to_100_value >= 60:
-                    # If nearest to 100 is >= 60, mark it as "Good to Go"
-                    df.loc[closest_to_100_index, "Decision"] = "Good to Go"
+            if rsubrange in ["FAST", "MED", "UP"]:
+                if priority_ratio >= 0.80:
+                    return "Absolute Priority"
+                elif 0.6 <= priority_ratio < 0.80:
+                    return "Very High"
+                elif 0.40 <= priority_ratio < 0.6:
+                    return "Low"
                 else:
-                    # If nearest to 100 is < 60, find the highest ratio row
-                    highest_ratio_index = blank_rows["Ratio"].idxmax()
-                    df.loc[highest_ratio_index, "Decision"] = "Good to Go"
+                    return "Very Low"
+            else:
+                if priority_ratio >= 0.95:
+                    return "Very High"
+                elif 0.40 <= priority_ratio < 0.95:
+                    return "Low"
+                else:
+                    return "Very Low"
 
-                # Mark remaining rows for the same Item Number as "Not to Use"
-                remaining_rows = blank_rows.drop(index=[closest_to_100_index] if closest_to_100_value >= 60 else [highest_ratio_index])
-                df.loc[remaining_rows.index, "Decision"] = "Not to Use"
+        # Apply the logic to calculate Priority Status
+        print("Calculating 'Priority Status' column...")
+        df["Priority Status"] = df.apply(calculate_priority_status, axis=1)
 
         # Save the updated dataframe
         print("Saving output file...")
@@ -61,10 +70,13 @@ def create_output19(input_file, output_file):
 
         # Apply formatting
         apply_formatting(output_file)
-        print(f"OUTPUT19.xlsx created and formatted at {output_file}")
+        print(f"OUTPUT23.xlsx created and formatted at {output_file}")
 
     except FileNotFoundError as e:
         print(f"File Not Found Error: {e}")
+        raise
+    except ValueError as e:
+        print(f"Value Error: {e}")
         raise
     except Exception as e:
         print(f"Error occurred while processing: {e}")
@@ -73,7 +85,7 @@ def create_output19(input_file, output_file):
 
 def apply_formatting(output_file):
     """
-    Apply formatting to the Excel file (OUTPUT19.xlsx).
+    Apply formatting to the Excel file (OUTPUT23.xlsx).
 
     Args:
         output_file (str): Path to the Excel file to format.
@@ -111,8 +123,8 @@ def apply_formatting(output_file):
 if __name__ == "__main__":
     # Dynamically resolve paths for compatibility
     base_path = Path(__file__).resolve().parent.parent.parent
-    input_file = base_path / "output" / "REPLEN" / "OUTPUT18.xlsx"
-    output_file = base_path / "output" / "REPLEN" / "OUTPUT19.xlsx"
+    input_file = base_path / "output" / "REPLEN" / "OUTPUT22.xlsx"
+    output_file = base_path / "output" / "REPLEN" / "OUTPUT23.xlsx"
 
     # Run the function
-    create_output19(input_file, output_file)
+    create_output23(input_file, output_file)

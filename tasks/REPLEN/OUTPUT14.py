@@ -1,70 +1,117 @@
-import pandas as pd
 import os
+from pathlib import Path
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
-# Define file paths
-output13_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT13.xlsx"
-output14_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT14.xlsx"
 
-# Load the OUTPUT13 file
-output13_df = pd.read_excel(output13_path)
+def create_output14(output_folder):
+    """
+    Add "Pallet Qty-Replen Stock" column to OUTPUT13.xlsx and save as OUTPUT14.xlsx.
 
-# Normalize column names
-output13_df.columns = output13_df.columns.str.strip().str.upper()
+    Args:
+        output_folder (str): Path to the folder containing the output files.
+    """
+    try:
+        # Resolve the output folder dynamically
+        output_folder = Path(output_folder).resolve()
+        print(f"Resolved output folder: {output_folder}")
 
-# Step 1: Check for required columns
-required_columns = [
-    'ITEM NUMBER', 'STOCK FOR REPLEN2', 'FINAL STATUS TO ADD',
-    'AVAILABLE POSTED QTY TO ADD', 'BALANCE STOCK FOR REPLEN', 'LEVEL', 'POSTED QUANTITY'
-]
-for col in required_columns:
-    if col not in output13_df.columns:
-        raise KeyError(f"Required column '{col}' is missing in OUTPUT13.xlsx")
+        # Check if the output folder exists
+        if not output_folder.exists():
+            raise FileNotFoundError(f"Output folder does not exist: {output_folder}")
 
-# Step 2: Function to allocate replen stock for "BALANCE" status
-def allocate_replen_stock(group):
-    balance_stock = group['BALANCE STOCK FOR REPLEN'].iloc[0]  # Get total balance stock
-    sorted_group = group.sort_values(by='POSTED QUANTITY', ascending=False).copy()
-    final_stock = []  # List to hold the allocated stock for each row
+        # File paths
+        output13_file = output_folder / "OUTPUT13.xlsx"
+        output14_file = output_folder / "OUTPUT14.xlsx"
 
-    for _, row in sorted_group.iterrows():
-        if balance_stock > 0:  # If there is still stock to allocate
-            if row['POSTED QUANTITY'] <= balance_stock:
-                final_stock.append(row['POSTED QUANTITY'])  # Allocate full posted quantity
-                balance_stock -= row['POSTED QUANTITY']  # Reduce balance stock
-            else:
-                final_stock.append(balance_stock)  # Allocate remaining balance stock
-                balance_stock = 0  # Balance stock is now zero
-        else:
-            final_stock.append(0)  # No stock to allocate
-    sorted_group['FINAL STOCK FOR REPLEN'] = final_stock
-    return sorted_group
+        # Check if OUTPUT13.xlsx exists
+        if not output13_file.exists():
+            raise FileNotFoundError(f"{output13_file} not found.")
 
-# Apply allocation logic to groups of ITEM NUMBER where FINAL STATUS TO ADD is BALANCE
-output13_df = output13_df.groupby('ITEM NUMBER', group_keys=False).apply(
-    lambda group: allocate_replen_stock(group) if group['FINAL STATUS TO ADD'].iloc[0] == "BALANCE" else group
-)
+        # Load OUTPUT13.xlsx
+        print("Loading OUTPUT13.xlsx...")
+        df = pd.read_excel(output13_file)
 
-# Step 3: For rows with FINAL STATUS TO ADD = "FULL", use POSTED QUANTITY
-output13_df['FINAL STOCK FOR REPLEN'] = output13_df.apply(
-    lambda row: row['POSTED QUANTITY'] if row['FINAL STATUS TO ADD'] == "FULL" else row['FINAL STOCK FOR REPLEN'],
-    axis=1
-)
+        # Normalize column names for consistency
+        df.columns = df.columns.str.lower()
 
-# Step 4: Calculate "LEVEL STATUS"
-def calculate_level_status(level):
-    if level == "A":
-        return "A LOCATION REPLENS"
-    elif level in ["B", "C"]:
-        return "PALLET STACKER REPLENS"
-    else:
-        return "REACH REPLENS"
+        # Check for required columns
+        required_columns = ["posted quantity", "stock for replen"]
+        for col in required_columns:
+            if col not in df.columns:
+                raise ValueError(f"Missing required column: {col}")
 
-# Apply the logic to calculate "LEVEL STATUS"
-output13_df['LEVEL STATUS'] = output13_df['LEVEL'].apply(calculate_level_status)
+        # Add "Pallet Qty-Replen Stock" column
+        print("Adding 'Pallet Qty-Replen Stock' column...")
+        df["pallet qty-replen stock"] = df["posted quantity"] - df["stock for replen"]
 
-# Save the final dataframe as OUTPUT14
-try:
-    output13_df.to_excel(output14_path, index=False)
-    print(f"OUTPUT14 file saved at: {output14_path}")
-except Exception as e:
-    print(f"An error occurred while saving OUTPUT14: {e}")
+        # Save to OUTPUT14.xlsx
+        print(f"Saving OUTPUT14.xlsx to: {output14_file}")
+        os.makedirs(output_folder, exist_ok=True)
+        df.to_excel(output14_file, index=False)
+
+        # Apply formatting
+        print("Applying formatting to OUTPUT14.xlsx...")
+        apply_formatting(output14_file)
+        print(f"OUTPUT14.xlsx created and formatted successfully at {output14_file}")
+
+        return output14_file
+
+    except FileNotFoundError as e:
+        print(f"File Not Found Error: {str(e)}")
+        raise
+    except ValueError as e:
+        print(f"Value Error: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Error occurred while processing: {e}")
+        raise
+
+
+def apply_formatting(output_file):
+    """
+    Apply formatting to the Excel file (OUTPUT14.xlsx).
+
+    Args:
+        output_file (str): Path to the Excel file to format.
+    """
+    wb = load_workbook(output_file)
+    sheet = wb.active
+
+    # Freeze the first row and column
+    sheet.freeze_panes = sheet["B2"]
+
+    # Styling for column headings
+    heading_font = Font(bold=True, color="FFFF00")  # Yellow font
+    heading_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")  # Dark blue background
+    alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Format the first row (Column Headings)
+    for col_num, cell in enumerate(sheet[1], start=1):
+        cell.value = cell.value.title()  # Capitalize each word in the header
+        cell.font = heading_font
+        cell.fill = heading_fill
+        cell.alignment = alignment
+        # Adjust column width based on content
+        max_length = max((len(str(cell.value or "")) for cell in sheet[get_column_letter(col_num)]), default=0)
+        sheet.column_dimensions[get_column_letter(col_num)].width = max(max_length + 2, 15)
+
+    # Apply alignment to all data cells
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
+        for cell in row:
+            cell.alignment = alignment
+
+    # Save the formatted file
+    wb.save(output_file)
+
+
+if __name__ == "__main__":
+    # Dynamically resolve the output folder path
+    base_path = Path(__file__).resolve().parent.parent.parent
+    output_folder = base_path / "output" / "REPLEN"
+
+    # Run the function
+    create_output14(output_folder)
+

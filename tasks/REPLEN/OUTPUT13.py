@@ -1,43 +1,117 @@
-import pandas as pd
 import os
+from pathlib import Path
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
-# Define file paths
-output12_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT12.xlsx"
-output13_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT13.xlsx"
 
-# Load the OUTPUT12 file
-output12_df = pd.read_excel(output12_path)
+def create_output13(output_folder):
+    """
+    Add "Decision" column to OUTPUT12.xlsx and save as OUTPUT13.xlsx.
 
-# Normalize column names
-output12_df.columns = output12_df.columns.str.strip().str.upper()
+    Args:
+        output_folder (str): Path to the folder containing the output files.
+    """
+    try:
+        # Resolve the output folder dynamically
+        output_folder = Path(output_folder).resolve()
+        print(f"Resolved output folder: {output_folder}")
 
-# Step 1: Check for required columns
-required_columns = [
-    'ITEM NUMBER', 'STOCK FOR REPLEN2', 'TOTAL POSTED QTY2',
-    'BALANCE STOCK FOR REPLEN', 'AVAILABLE POSTED QTY TO ADD'
-]
-for col in required_columns:
-    if col not in output12_df.columns:
-        raise KeyError(f"Required column '{col}' is missing in OUTPUT12.xlsx")
+        # Check if output folder exists
+        if not output_folder.exists():
+            raise FileNotFoundError(f"Output folder does not exist: {output_folder}")
 
-# Step 2: Calculate "FINAL STATUS TO ADD"
-def calculate_final_status(row):
-    available_posted_qty_to_add = row['AVAILABLE POSTED QTY TO ADD']
-    balance_stock_for_replen = row['BALANCE STOCK FOR REPLEN']
+        # File paths
+        output12_file = output_folder / "OUTPUT12.xlsx"
+        output13_file = output_folder / "OUTPUT13.xlsx"
 
-    # Check conditions for "FULL"
-    if available_posted_qty_to_add < balance_stock_for_replen:
-        return "FULL"
-    elif (
-        balance_stock_for_replen < available_posted_qty_to_add <= balance_stock_for_replen * 1.10
-    ):
-        return "FULL"
-    else:
-        return "BALANCE"
+        # Check if OUTPUT12.xlsx exists
+        if not output12_file.exists():
+            raise FileNotFoundError(f"{output12_file} not found.")
 
-# Apply the logic to calculate "FINAL STATUS TO ADD"
-output12_df['FINAL STATUS TO ADD'] = output12_df.apply(calculate_final_status, axis=1)
+        # Load OUTPUT12.xlsx
+        print("Loading OUTPUT12.xlsx...")
+        df = pd.read_excel(output12_file)
 
-# Save the final dataframe as OUTPUT13
-output12_df.to_excel(output13_path, index=False)
-print(f"OUTPUT13 file saved at: {output13_path}")
+        # Normalize column names for consistency
+        df.columns = df.columns.str.lower()
+
+        # Check for the required column
+        if "number of item number" not in df.columns:
+            raise ValueError("Missing required column: 'Number Of Item Number'")
+
+        # Add "Decision" column
+        print("Adding 'Decision' column...")
+        df["decision"] = df["number of item number"].apply(
+            lambda x: "Good to Go" if x == 1 else ""
+        )
+
+        # Save to OUTPUT13.xlsx
+        print(f"Saving OUTPUT13.xlsx to: {output13_file}")
+        os.makedirs(output_folder, exist_ok=True)
+        df.to_excel(output13_file, index=False)
+
+        # Apply formatting
+        print("Applying formatting to OUTPUT13.xlsx...")
+        apply_formatting(output13_file)
+        print(f"OUTPUT13.xlsx created and formatted successfully at {output13_file}")
+
+        return output13_file
+
+    except FileNotFoundError as e:
+        print(f"File Not Found Error: {str(e)}")
+        raise
+    except ValueError as e:
+        print(f"Value Error: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Error occurred while processing: {e}")
+        raise
+
+
+def apply_formatting(output_file):
+    """
+    Apply formatting to the Excel file (OUTPUT13.xlsx).
+
+    Args:
+        output_file (str): Path to the Excel file to format.
+    """
+    wb = load_workbook(output_file)
+    sheet = wb.active
+
+    # Freeze the first row and column
+    sheet.freeze_panes = sheet["B2"]
+
+    # Styling for column headings
+    heading_font = Font(bold=True, color="FFFF00")  # Yellow font
+    heading_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")  # Dark blue background
+    alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Format the first row (Column Headings)
+    for col_num, cell in enumerate(sheet[1], start=1):
+        cell.value = cell.value.title()  # Capitalize each word in the header
+        cell.font = heading_font
+        cell.fill = heading_fill
+        cell.alignment = alignment
+        # Adjust column width based on content
+        max_length = max((len(str(cell.value or "")) for cell in sheet[get_column_letter(col_num)]), default=0)
+        sheet.column_dimensions[get_column_letter(col_num)].width = max(max_length + 2, 15)
+
+    # Apply alignment to all data cells
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
+        for cell in row:
+            cell.alignment = alignment
+
+    # Save the formatted file
+    wb.save(output_file)
+
+
+if __name__ == "__main__":
+    # Dynamically resolve the output folder path
+    base_path = Path(__file__).resolve().parent.parent.parent
+    output_folder = base_path / "output" / "REPLEN"
+
+    # Run the function
+    create_output13(output_folder)
+

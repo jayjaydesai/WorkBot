@@ -1,40 +1,109 @@
-import pandas as pd
 import os
+from pathlib import Path
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Alignment, PatternFill, Font
+from openpyxl.utils import get_column_letter
 
-# Define file paths
-output7_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT7.xlsx"
-output8_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT8.xlsx"
 
-# Load the OUTPUT7 file
-output7_df = pd.read_excel(output7_path)
+def create_output8(output_folder):
+    """
+    Remove rows where "Ugly" column is "UGLY" unless "Stock" column is greater than 0.
+    Save the result as OUTPUT8.xlsx, preserving formatting.
 
-# Normalize column names
-output7_df.columns = output7_df.columns.str.strip().str.upper()
+    Args:
+        output_folder (str): Path to the folder containing OUTPUT7.xlsx.
+    """
+    try:
+        # Resolve output folder dynamically
+        output_folder = Path(output_folder).resolve()
+        print(f"Resolved output folder: {output_folder}")
 
-# Step 1: Check for required columns
-required_columns = [
-    'ITEM NUMBER', 'POSTED QUANTITY', 'STOCK FOR REPLEN', 
-    'TOTAL POSTED QTY', 'SUB RANGE'
-]
-for col in required_columns:
-    if col not in output7_df.columns:
-        raise KeyError(f"Required column '{col}' is missing in OUTPUT7.xlsx")
+        if not output_folder.exists():
+            raise FileNotFoundError(f"Output folder does not exist: {output_folder}")
 
-# Step 2: Create the USE LOCATION STATUS column
-def determine_location_status(row):
-    if row['STOCK FOR REPLEN'] == "DECISION" or row['STOCK FOR REPLEN'] == 0:
-        return "NO USE"
-    return "USE"
+        # File paths
+        output7_file = output_folder / "OUTPUT7.xlsx"
+        output8_file = output_folder / "OUTPUT8.xlsx"
 
-output7_df['USE LOCATION STATUS'] = output7_df.apply(determine_location_status, axis=1)
+        if not output7_file.exists():
+            raise FileNotFoundError(f"Required file not found: {output7_file}")
 
-# Step 3: Add a calculated column for BALANCE POSTED QTY
-output7_df['BALANCE POSTED QTY'] = output7_df['POSTED QUANTITY'] - output7_df['STOCK FOR REPLEN'].replace("DECISION", 0)
+        # Load OUTPUT7.xlsx
+        print("Loading OUTPUT7.xlsx...")
+        wb = load_workbook(output7_file)
+        ws = wb.active
 
-# Step 4: Save the final dataframe as OUTPUT8
-if not os.path.exists(os.path.dirname(output8_path)):
-    os.makedirs(os.path.dirname(output8_path))  # Create the output folder if it doesn't exist
+        # Read all rows into memory
+        rows = list(ws.iter_rows(values_only=True))
+        header = rows[0]  # Extract the header row
 
-output7_df.to_excel(output8_path, index=False)
-print(f"OUTPUT8 file saved at: {output8_path}")
+        # Ensure necessary columns exist
+        if "Ugly" not in header or "Stock" not in header:
+            raise ValueError("Required columns 'Ugly' or 'Stock' not found in OUTPUT7.xlsx.")
+
+        # Get column indexes for filtering
+        ugly_index = header.index("Ugly")
+        stock_index = header.index("Stock")
+
+        # Filter rows based on the condition
+        print("Filtering rows based on 'Ugly' and 'Stock' conditions...")
+        filtered_rows = [
+            row for row in rows[1:]  # Skip header row
+            if not (row[ugly_index] == "UGLY" and (row[stock_index] is None or row[stock_index] <= 0))
+        ]
+
+        # Create a new workbook for OUTPUT8.xlsx
+        new_wb = Workbook()
+        new_ws = new_wb.active
+
+        # Write header and filtered rows to the new worksheet
+        print("Writing filtered rows to OUTPUT8.xlsx...")
+        new_ws.append(header)  # Write the header row
+        for row in filtered_rows:
+            new_ws.append(row)
+
+        # Apply formatting
+        print("Applying formatting to OUTPUT8.xlsx...")
+        header_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")  # Dark Blue
+        header_font = Font(color="FFFF00", bold=True)  # Yellow font
+        alignment = Alignment(horizontal="center", vertical="center")
+
+        for col, cell in enumerate(new_ws[1], start=1):
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = alignment
+            col_letter = get_column_letter(col)
+            new_ws.column_dimensions[col_letter].width = max(len(str(cell.value or "")) + 2, 12)
+
+        # Apply center alignment to all data rows
+        for row in new_ws.iter_rows(min_row=2, max_row=new_ws.max_row):
+            for cell in row:
+                cell.alignment = alignment
+
+        # Freeze the first row and column
+        new_ws.freeze_panes = "B2"
+
+        # Save the new workbook as OUTPUT8.xlsx
+        print(f"Saving OUTPUT8.xlsx to: {output8_file}")
+        new_wb.save(output8_file)
+        print(f"OUTPUT8.xlsx created successfully at {output8_file}")
+
+    except FileNotFoundError as e:
+        print(f"File Not Found Error: {str(e)}")
+        raise
+    except ValueError as e:
+        print(f"Value Error: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Error occurred while processing: {e}")
+        raise
+
+
+if __name__ == "__main__":
+    # Dynamically resolve the output folder path
+    base_path = Path(__file__).resolve().parent.parent.parent
+    output_folder = base_path / "output" / "REPLEN"
+
+    # Run the function
+    create_output8(output_folder)
 

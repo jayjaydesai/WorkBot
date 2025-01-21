@@ -1,61 +1,124 @@
-import pandas as pd
 import os
+import pandas as pd
+from pathlib import Path
+from openpyxl import load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
-# Define file paths
-output1_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT1.xlsx"
-coverage_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\2-SOURCE_FILES\COVERAGE.xlsx"
-output2_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT2.xlsx"
 
-# Load the data
-output1_df = pd.read_excel(output1_path)
-coverage_df = pd.read_excel(coverage_path)
+def create_output2(upload_folder, output_folder):
+    """
+    Process OUTPUT1.xlsx and merge with EXPORT.xlsx to create OUTPUT2.xlsx,
+    replacing blank cells in "Available Physical" with 0.
 
-# Normalize column names (strip spaces and convert to lowercase for consistency)
-output1_df.columns = output1_df.columns.str.strip().str.lower()
-coverage_df.columns = coverage_df.columns.str.strip().str.lower()
+    Args:
+        upload_folder (str): Path to the folder containing uploaded files.
+        output_folder (str): Path to save the output file.
+    """
+    try:
+        # Resolve paths dynamically
+        upload_folder = Path(upload_folder).resolve()
+        output_folder = Path(output_folder).resolve()
 
-# Check if 'item number' exists in both files
-if 'item number' not in output1_df.columns or 'item number' not in coverage_df.columns:
-    raise KeyError("'Item number' column is missing in one of the files.")
+        # Debugging: Print resolved paths
+        print(f"Resolved upload folder: {upload_folder}")
+        print(f"Resolved output folder: {output_folder}")
 
-# Ensure case-insensitive matching by converting 'item number' to lowercase
-output1_df['item number'] = output1_df['item number'].astype(str).str.lower()
-coverage_df['item number'] = coverage_df['item number'].astype(str).str.lower()
+        # Ensure folders exist
+        if not upload_folder.exists():
+            raise FileNotFoundError(f"Upload folder does not exist: {upload_folder}")
+        output_folder.mkdir(parents=True, exist_ok=True)
 
-# Select only the required columns from COVERAGE
-# Updated required_columns to lowercase
-required_columns = ['item number', 'product group', 'rsubrange', 'brand', 'rmin', 'rcoverage']
+        # File paths
+        output1_file = output_folder / "OUTPUT1.xlsx"
+        export_file = upload_folder / "EXPORT.xlsx"
+        output2_file = output_folder / "OUTPUT2.xlsx"
 
-# Check for missing columns
-missing_columns = [col for col in required_columns if col not in coverage_df.columns]
-if missing_columns:
-    raise KeyError(f"Missing columns in COVERAGE file: {missing_columns}")
+        # Check if required files exist
+        if not output1_file.exists():
+            raise FileNotFoundError(f"Required file not found: {output1_file}")
+        if not export_file.exists():
+            print(f"Warning: EXPORT.xlsx not found. Proceeding without it.")
+            export_df = pd.DataFrame(columns=["item number", "stock"])  # Create an empty DataFrame if EXPORT.xlsx is missing
+        else:
+            # Load EXPORT.xlsx
+            print("Loading EXPORT.xlsx...")
+            export_df = pd.read_excel(export_file, usecols=["Item Number", "Stock"])
+            export_df.columns = export_df.columns.str.lower().str.strip()  # Normalize column names
 
-coverage_subset = coverage_df[required_columns]
+        # Load OUTPUT1.xlsx
+        print("Loading OUTPUT1.xlsx...")
+        output1_df = pd.read_excel(output1_file)
+        output1_df.columns = output1_df.columns.str.lower().str.strip()  # Normalize column names
 
-# Merge OUTPUT1 and COVERAGE based on 'item number'
-merged_df = pd.merge(output1_df, coverage_subset, on='item number', how='left')
+        # Replace blank cells in "Available Physical" column with 0
+        if "available physical" in output1_df.columns:
+            output1_df["available physical"] = output1_df["available physical"].fillna(0)
 
-# Convert all column headings to uppercase
-merged_df.columns = merged_df.columns.str.upper()
+        # Merge OUTPUT1.xlsx with EXPORT.xlsx on "Item Number"
+        print("Merging OUTPUT1.xlsx with EXPORT.xlsx...")
+        final_df = pd.merge(output1_df, export_df, on="item number", how="left")
 
-# Convert specific text columns to uppercase
-columns_to_uppercase = ['ITEM NUMBER', 'WAREHOUSE', 'LOCATION', 'STOCK STATUS', 'LICENCE PLATE']
-for col in columns_to_uppercase:
-    if col in merged_df.columns:
-        merged_df[col] = merged_df[col].astype(str).str.upper()
+        # Save to OUTPUT2.xlsx
+        print(f"Saving OUTPUT2.xlsx to: {output2_file}")
+        final_df.to_excel(output2_file, index=False)
 
-# Replace blank or missing values in 'RSUBRANGE' with 'NEW'
-if 'RSUBRANGE' in merged_df.columns:
-    merged_df['RSUBRANGE'] = merged_df['RSUBRANGE'].fillna('NEW')
+        # Apply formatting
+        apply_formatting(output2_file)
+        print(f"OUTPUT2.xlsx created and formatted successfully at {output2_file}")
 
-# Replace blank or missing values in 'AS01011-AVAILABLE PHYSICAL' with '0'
-if 'AS01011-AVAILABLE PHYSICAL' in merged_df.columns:
-    merged_df['AS01011-AVAILABLE PHYSICAL'] = merged_df['AS01011-AVAILABLE PHYSICAL'].fillna(0)
+        return output2_file
 
-# Save the final merged file
-if not os.path.exists(os.path.dirname(output2_path)):
-    os.makedirs(os.path.dirname(output2_path))  # Create the output folder if it doesn't exist
+    except FileNotFoundError as e:
+        print(f"File Not Found Error: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Error occurred while processing: {e}")
+        raise
 
-merged_df.to_excel(output2_path, index=False)
-print(f"Merged file saved at: {output2_path}")
+
+def apply_formatting(output_file):
+    """
+    Apply formatting to the Excel file (OUTPUT2.xlsx).
+
+    Args:
+        output_file (str): Path to the Excel file to format.
+    """
+    wb = load_workbook(output_file)
+    sheet = wb.active
+
+    # Freeze the first row and column
+    sheet.freeze_panes = sheet["B2"]
+
+    # Styling for column headings
+    heading_font = Font(bold=True, color="FFFF00")  # Yellow font
+    heading_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")  # Dark blue background
+    alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Format the first row (Column Headings)
+    for col_num, cell in enumerate(sheet[1], start=1):
+        cell.value = cell.value.title()  # Capitalize each word in the header
+        cell.font = heading_font
+        cell.fill = heading_fill
+        cell.alignment = alignment
+        # Adjust column width based on content
+        max_length = max((len(str(cell.value or "")) for cell in sheet[get_column_letter(col_num)]), default=0)
+        sheet.column_dimensions[get_column_letter(col_num)].width = max(max_length + 2, 15)
+
+    # Apply alignment to all data cells
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
+        for cell in row:
+            cell.alignment = alignment
+
+    # Save the formatted file
+    wb.save(output_file)
+
+
+if __name__ == "__main__":
+    # Dynamically determine paths
+    base_path = Path(__file__).resolve().parents[2]  # Go up two levels from this script's location
+    upload_folder = base_path / "uploads" / "REPLEN"
+    output_folder = base_path / "output" / "REPLEN"
+
+    # Run the function
+    create_output2(upload_folder, output_folder)

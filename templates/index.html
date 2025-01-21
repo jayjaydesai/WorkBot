@@ -12,19 +12,16 @@
             background-color: #f4f4f9;
             color: #333;
         }
-
         header {
             background-color: #007bff;
             color: white;
             padding: 20px 0;
             text-align: center;
         }
-
         header h1 {
             margin: 0;
             font-size: 2.5em;
         }
-
         main {
             max-width: 800px;
             margin: 30px auto;
@@ -33,11 +30,9 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             border-radius: 8px;
         }
-
         label {
             font-weight: bold;
         }
-
         select, input[type="file"], input[type="text"], button {
             margin-top: 10px;
             padding: 10px;
@@ -46,60 +41,174 @@
             border-radius: 5px;
             width: 100%;
         }
-
         button {
             background-color: #007bff;
             color: white;
             border: none;
             cursor: pointer;
         }
-
         button:hover {
             background-color: #0056b3;
         }
-
         .task-inputs {
             display: none;
         }
-
         footer {
             text-align: center;
             margin-top: 30px;
             font-size: 0.9em;
             color: #777;
         }
+        .flash-message {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            color: #fff;
+        }
+        .flash-success {
+            background-color: #28a745;
+        }
+        .flash-error {
+            background-color: #dc3545;
+        }
+        .button-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .file-instructions {
+            font-size: 0.9em;
+            color: #555;
+            margin-top: 5px;
+        }
+        .task-section {
+            margin-bottom: 30px; /* Adds space below the "Select Task" dropdown */
+        }
+        /* Processing Overlay */
+#processing-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+}
+
+.overlay-content {
+    text-align: center;
+}
+
+.adventure-container {
+    width: 80%;
+    max-width: 600px;
+    margin: 20px auto;
+    position: relative;
+}
+
+.progress-bar {
+    background: #444;
+    height: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    margin-top: 50px;
+}
+
+.progress-fill {
+    background: #28a745;
+    height: 100%;
+    width: 0;
+    transition: width 0.5s ease;
+}
+
+.character {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    width: 40px;
+    height: 40px;
+    background: url('https://via.placeholder.com/40') no-repeat center;
+    background-size: cover;
+    transition: left 0.5s ease;
+}
+
+.processing-quote {
+    font-size: 1.5em;
+    margin-top: 20px;
+    font-style: italic;
+}
     </style>
     <script>
-function toggleInputs() {
-    const task = document.getElementById("task").value;
-    const form = document.getElementById("task-form");
+        function toggleInputs() {
+            const task = document.getElementById("task").value;
+            const form = document.getElementById("task-form");
 
-    // Hide all task-specific input sections by default and disable their inputs
-    document.querySelectorAll(".task-inputs").forEach(section => {
-        section.style.display = "none";
-        section.querySelectorAll("input").forEach(input => {
-            input.disabled = true; // Disable all inputs in hidden sections
-        });
-    });
+            // Hide all task-specific input sections by default and disable their inputs
+            document.querySelectorAll(".task-inputs").forEach(section => {
+                section.style.display = "none";
+                section.querySelectorAll("input").forEach(input => {
+                    input.disabled = true;
+                });
+            });
 
-    // Update form action and show inputs based on the selected task
-    if (task === "bulk_report") {
-        form.action = "/";
-        const bulkInputs = document.getElementById("bulk-report-inputs");
-        bulkInputs.style.display = "block";
-        bulkInputs.querySelectorAll("input").forEach(input => {
-            input.disabled = false; // Enable inputs for Bulk Report
-        });
-    } else if (task === "check_empty_location") {
-        form.action = "/run-checkempty";
-        const checkEmptyInputs = document.getElementById("check-empty-location-inputs");
-        checkEmptyInputs.style.display = "block";
-        checkEmptyInputs.querySelectorAll("input").forEach(input => {
-            input.disabled = false; // Enable inputs for CHECK EMPTY LOCATION
-        });
-    } else {
-        form.action = "#";
-    }
+            // Update form action and show inputs based on the selected task
+            if (task === "bulk_report") {
+                form.action = "/";
+                const bulkInputs = document.getElementById("bulk-report-inputs");
+                bulkInputs.style.display = "block";
+                bulkInputs.querySelectorAll("input").forEach(input => {
+                    input.disabled = false;
+                });
+            } else if (task === "replen_stock") {
+                form.action = "/run-replen";
+                const replenInputs = document.getElementById("replen-stock-inputs");
+                replenInputs.style.display = "block";
+                replenInputs.querySelectorAll("input").forEach(input => {
+                    input.disabled = false;
+                });
+            } else if (task === "check_empty_location") {
+                form.action = "/run-checkempty";
+                const checkEmptyInputs = document.getElementById("check-empty-location-inputs");
+                checkEmptyInputs.style.display = "block";
+                checkEmptyInputs.querySelectorAll("input").forEach(input => {
+                    input.disabled = false;
+                });
+            } else {
+                form.action = "#";
+            }
+        }
+
+        // Show the processing overlay and start the progress adventure
+function showProcessingOverlay() {
+    const overlay = document.getElementById("processing-overlay");
+    const progressFill = document.getElementById("progress-fill");
+    const character = document.getElementById("progress-character");
+
+    overlay.style.display = "flex";
+    let progress = 0;
+
+    const interval = setInterval(() => {
+        progress += 10;
+        progressFill.style.width = progress + "%";
+        character.style.left = progress + "%";
+
+        if (progress >= 100) {
+            clearInterval(interval);
+        }
+    }, 400); // Adjust time per step as needed
+}
+
+// Hide the processing overlay
+function hideProcessingOverlay() {
+    const overlay = document.getElementById("processing-overlay");
+    overlay.style.display = "none";
 }
 
     </script>
@@ -108,45 +217,82 @@ function toggleInputs() {
     <header>
         <h1>ProcessHub</h1>
     </header>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div id="flash-messages">
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
     <main>
-        <form id="task-form" method="post" enctype="multipart/form-data" action="#">
-            <!-- Task Selection -->
-            <div class="task-section">
-                <label for="task">Select a Task:</label>
-                <select name="task" id="task" onchange="toggleInputs()" required>
-                    <option value="">-- Select a Task --</option>
-                    <option value="bulk_report">Bulk Report</option>
-                    <option value="replen_stock">Replen Stock (Still Not Integrated)</option>
-                    <option value="check_empty_location">Check Empty location</option>
-                </select>
+        {% if download_link %}
+            <!-- Display Download Link -->
+            <h2>Task Completed Successfully</h2>
+            <p>Your output file is ready:</p>
+            <div class="button-container">
+                <a href="{{ download_link }}" target="_blank" style="text-decoration: none; padding: 10px 20px; background-color: #28a745; color: white; border-radius: 5px;">Download OUTPUT28.xlsx</a>
+                <a href="/" style="text-decoration: none; padding: 10px 20px; background-color: #007bff; color: white; border-radius: 5px;">Back to Home</a>
             </div>
+        {% else %}
+            <!-- Display Task Selection Form -->
+            <form id="task-form" method="post" enctype="multipart/form-data" action="#">
+                <!-- Task Selection -->
+                <div class="task-section">
+                    <label for="task">Select a Task:</label>
+                    <select name="task" id="task" onchange="toggleInputs()" required>
+                        <option value="">-- Select a Task --</option>
+                        <option value="bulk_report">Bulk Report</option>
+                        <option value="replen_stock">Replen Stock</option>
+                        <option value="check_empty_location">Check Empty Location</option>
+                    </select>
+                </div>
 
-            <!-- Bulk Report Inputs -->
-            <div id="bulk-report-inputs" class="task-inputs">
-                <label for="file-bulk-report">Select the BULK file:</label>
-                <input type="file" name="file" id="file-bulk-report" required>
-                <label for="aisle">Enter Aisle ID (e.g., A09) or leave blank for all aisles:</label>
-                <input type="text" name="aisle" id="aisle" placeholder="A09">
-            </div>
+                <!-- Bulk Report Inputs -->
+                <div id="bulk-report-inputs" class="task-inputs">
+                    <label for="file-bulk-report">Select the BULK file:</label>
+                    <input type="file" name="file" id="file-bulk-report" accept=".xlsx" required>
+                    <p style="font-size: 0.9em; color: #555;">Upload the BULK.xlsx file containing the stock data for processing.</p>
+                    <label for="aisle">Enter Aisle ID (e.g., A09) or leave blank for all aisles:</label>
+                    <input type="text" name="aisle" id="aisle" placeholder="A09">
+                </div>
 
-            <!-- Replen Stock Inputs -->
-            <div id="replen-stock-inputs" class="task-inputs">
-                <label for="file-replen">Select Files for REPLEN Task:</label>
-                <input type="file" name="replen_files[]" id="file-replen" multiple>
-            </div>
+                <!-- Replen Stock Inputs -->
+                <div id="replen-stock-inputs" class="task-inputs">
+                    <label for="file-replen">Upload Required Files for REPLEN Task:</label>
+                    <input type="file" name="replen_files[]" id="file-replen" multiple accept=".xlsx" required>
+                    <p class="file-instructions">Required files: BULK.xlsx, AS01011.xlsx, COVERAGE.xlsx, EXPORT.xlsx, 3PL.xlsx</p>
+                </div>
 
-            <!-- CHECK EMPTY LOCATION Inputs -->
-            <div id="check-empty-location-inputs" class="task-inputs">
-                <label for="file-check-empty">Upload the Latest BULK.xlsx:</label>
-                <input type="file" name="file" id="file-check-empty" accept=".xlsx" required>
-            </div>
+                <!-- Check Empty Location Inputs -->
+                <div id="check-empty-location-inputs" class="task-inputs">
+                    <label for="file-check-empty">Upload the Latest BULK.xlsx:</label>
+                    <input type="file" name="file" id="file-check-empty" accept=".xlsx" required>
+                    <p style="font-size: 0.9em; color: #555;">Upload the latest BULK.xlsx file to identify empty locations.</p>
+                </div>
 
-            <!-- Submit Button -->
-            <button type="submit">Process Task</button>
-        </form>
+                <!-- Submit Button -->
+                <button type="submit" onclick="showProcessingOverlay()">Process Task</button>
+            </form>
+        {% endif %}
     </main>
     <footer>
         <p>&copy; 2025 ProcessHub. All rights reserved.</p>
     </footer>
+<div id="processing-overlay" style="display: none;">
+    <div class="overlay-content">
+        <div class="adventure-container">
+            <div id="progress-character" class="character"></div>
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+        </div>
+        <p class="processing-quote">Patience is the key to success! Sit tight, it’s only up to 5-minute adventure!</p>
+    </div>
+</div>
 </body>
 </html>

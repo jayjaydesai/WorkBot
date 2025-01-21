@@ -1,29 +1,112 @@
-import pandas as pd
 import os
+from pathlib import Path
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
-# Define file paths
-output8a_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT8A.xlsx"
-output9_path = r"C:\Users\jayde\OneDrive\AS-REPLEN-DAILY\OUTPUT\OUTPUT9.xlsx"
 
-# Load the OUTPUT8A file
-output8a_df = pd.read_excel(output8a_path)
+def create_output9(output_folder):
+    """
+    Add "Total Posted Qty" column to OUTPUT8.xlsx and save as OUTPUT9.xlsx.
 
-# Normalize column names
-output8a_df.columns = output8a_df.columns.str.strip().str.upper()
+    Args:
+        output_folder (str): Path to the folder containing OUTPUT8.xlsx.
+    """
+    try:
+        # Resolve output folder dynamically
+        output_folder = Path(output_folder).resolve()
+        print(f"Resolved output folder: {output_folder}")
 
-# Step 1: Check for required columns
-required_columns = ['ITEM NUMBER', 'LOCATION_X']
-for col in required_columns:
-    if col not in output8a_df.columns:
-        raise KeyError(f"Required column '{col}' is missing in OUTPUT8A.xlsx")
+        if not output_folder.exists():
+            raise FileNotFoundError(f"Output folder does not exist: {output_folder}")
 
-# Step 2: Add the calculated column "NUMBER OF LOCATIONS"
-output8a_df['NUMBER OF LOCATIONS'] = (
-    output8a_df.groupby('ITEM NUMBER')['LOCATION_X']
-    .transform('count')
-)
+        # File paths
+        output8_file = output_folder / "OUTPUT8.xlsx"
+        output9_file = output_folder / "OUTPUT9.xlsx"
 
-# Save the final dataframe as OUTPUT9
-output8a_df.to_excel(output9_path, index=False)
-print(f"OUTPUT9 file saved at: {output9_path}")
+        if not output8_file.exists():
+            raise FileNotFoundError(f"Required file not found: {output8_file}")
 
+        # Load OUTPUT8.xlsx
+        print("Loading OUTPUT8.xlsx...")
+        df = pd.read_excel(output8_file)
+
+        # Normalize column names to lower case for processing
+        df.columns = df.columns.str.lower()
+
+        # Validate required columns
+        if "item number" not in df.columns or "posted quantity" not in df.columns:
+            raise ValueError("Required columns 'Item Number' or 'Posted Quantity' not found in OUTPUT8.xlsx.")
+
+        # Add "Total Posted Qty" column
+        print("Calculating 'Total Posted Qty'...")
+        total_posted_qty = df.groupby("item number")[["posted quantity"]].transform("sum")
+        df["total posted qty"] = total_posted_qty
+
+        # Save to OUTPUT9.xlsx
+        print(f"Saving OUTPUT9.xlsx to: {output9_file}")
+        df.to_excel(output9_file, index=False)
+
+        # Apply formatting
+        print("Applying formatting to OUTPUT9.xlsx...")
+        apply_formatting(output9_file)
+        print(f"OUTPUT9.xlsx created and formatted successfully at {output9_file}")
+
+        return output9_file
+
+    except FileNotFoundError as e:
+        print(f"File Not Found Error: {str(e)}")
+        raise
+    except ValueError as e:
+        print(f"Value Error: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Error occurred while processing: {e}")
+        raise
+
+
+def apply_formatting(output_file):
+    """
+    Apply formatting to the Excel file (OUTPUT9.xlsx).
+
+    Args:
+        output_file (str): Path to the Excel file to format.
+    """
+    wb = load_workbook(output_file)
+    sheet = wb.active
+
+    # Freeze the first row and column
+    sheet.freeze_panes = sheet["B2"]
+
+    # Styling for column headings
+    heading_font = Font(bold=True, color="FFFF00")  # Yellow font
+    heading_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")  # Dark blue background
+    alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Format the first row (Column Headings)
+    for col_num, cell in enumerate(sheet[1], start=1):
+        cell.value = cell.value.title()  # Capitalize each word in the header
+        cell.font = heading_font
+        cell.fill = heading_fill
+        cell.alignment = alignment
+        # Adjust column width based on content
+        max_length = max((len(str(cell.value or "")) for cell in sheet[get_column_letter(col_num)]), default=0)
+        sheet.column_dimensions[get_column_letter(col_num)].width = max(max_length + 2, 15)
+
+    # Apply alignment to all data cells
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
+        for cell in row:
+            cell.alignment = alignment
+
+    # Save the formatted file
+    wb.save(output_file)
+
+
+if __name__ == "__main__":
+    # Dynamically resolve the output folder path
+    base_path = Path(__file__).resolve().parent.parent.parent
+    output_folder = base_path / "output" / "REPLEN"
+
+    # Run the function
+    create_output9(output_folder)

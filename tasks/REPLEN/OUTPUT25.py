@@ -5,16 +5,13 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 
-def create_output19(input_file, output_file):
+def create_output25(input_file, output_file):
     """
-    Update 'Decision' column for each Item Number group based on the 'Ratio' column.
-    - If the nearest number to 100 is above 60, mark it as "Good to Go".
-    - If the nearest number to 100 is below 60, mark the highest ratio row as "Good to Go".
-    - Mark remaining rows for the same Item Number as "Not to Use".
+    Remove rows where "Decision" is "Not to Use" and add new blank columns.
 
     Args:
-        input_file (str): Path to the input file (e.g., OUTPUT18.xlsx).
-        output_file (str): Path to save the output file (e.g., OUTPUT19.xlsx).
+        input_file (str): Path to the input file (e.g., OUTPUT24.xlsx).
+        output_file (str): Path to save the output file (e.g., OUTPUT25.xlsx).
     """
     try:
         # Resolve paths dynamically for compatibility
@@ -34,34 +31,23 @@ def create_output19(input_file, output_file):
         # Ensure column names are consistent
         df.columns = df.columns.str.strip()
 
-        # Iterate through each Item Number group
-        for item_number, group in df.groupby("Item Number"):
-            blank_rows = group[group["Decision"].isna()]  # Rows with blank "Decision"
+        # Filter rows where "Decision" is not "Not to Use"
+        print("Filtering rows where 'Decision' is 'Not to Use'...")
+        filtered_df = df[df["Decision"] != "Not to Use"]
 
-            if not blank_rows.empty:
-                # Find the nearest Ratio to 100
-                closest_to_100_index = (blank_rows["Ratio"] - 100).abs().idxmin()
-                closest_to_100_value = blank_rows.loc[closest_to_100_index, "Ratio"]
-
-                if closest_to_100_value >= 60:
-                    # If nearest to 100 is >= 60, mark it as "Good to Go"
-                    df.loc[closest_to_100_index, "Decision"] = "Good to Go"
-                else:
-                    # If nearest to 100 is < 60, find the highest ratio row
-                    highest_ratio_index = blank_rows["Ratio"].idxmax()
-                    df.loc[highest_ratio_index, "Decision"] = "Good to Go"
-
-                # Mark remaining rows for the same Item Number as "Not to Use"
-                remaining_rows = blank_rows.drop(index=[closest_to_100_index] if closest_to_100_value >= 60 else [highest_ratio_index])
-                df.loc[remaining_rows.index, "Decision"] = "Not to Use"
+        # Add new blank columns
+        print("Adding blank columns...")
+        filtered_df["Missing Pallet"] = ""
+        filtered_df["Missing Item Number"] = ""
+        filtered_df["Comment"] = ""
 
         # Save the updated dataframe
         print("Saving output file...")
-        df.to_excel(output_file, index=False)
+        filtered_df.to_excel(output_file, index=False)
 
         # Apply formatting
         apply_formatting(output_file)
-        print(f"OUTPUT19.xlsx created and formatted at {output_file}")
+        print(f"OUTPUT25.xlsx created and formatted at {output_file}")
 
     except FileNotFoundError as e:
         print(f"File Not Found Error: {e}")
@@ -73,7 +59,7 @@ def create_output19(input_file, output_file):
 
 def apply_formatting(output_file):
     """
-    Apply formatting to the Excel file (OUTPUT19.xlsx).
+    Apply formatting to the Excel file (OUTPUT25.xlsx).
 
     Args:
         output_file (str): Path to the Excel file to format.
@@ -111,8 +97,8 @@ def apply_formatting(output_file):
 if __name__ == "__main__":
     # Dynamically resolve paths for compatibility
     base_path = Path(__file__).resolve().parent.parent.parent
-    input_file = base_path / "output" / "REPLEN" / "OUTPUT18.xlsx"
-    output_file = base_path / "output" / "REPLEN" / "OUTPUT19.xlsx"
+    input_file = base_path / "output" / "REPLEN" / "OUTPUT24.xlsx"
+    output_file = base_path / "output" / "REPLEN" / "OUTPUT25.xlsx"
 
     # Run the function
-    create_output19(input_file, output_file)
+    create_output25(input_file, output_file)
