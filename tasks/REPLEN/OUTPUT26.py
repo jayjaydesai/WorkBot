@@ -41,6 +41,7 @@ def create_output26(input_file, output_file):
             "Sr. No.",
             "Item Number",
             "Location",
+            "Stock Status",
             "Licence Plate",
             "Posted Quantity",
             "Final Replen Stock",

@@ -19,15 +19,20 @@ load_dotenv()
 # Define folder paths from environment variables
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
 UPLOAD_FOLDER_REPLEN = BASE_DIR / "uploads" / "REPLEN"
+UPLOAD_FOLDER_TARGETPER = BASE_DIR / "uploads" / "TARGETPER"  # Folder for TARGETPER uploads
 OUTPUT_FOLDER = os.getenv("OUTPUT_FOLDER", "output")
 OUTPUT_FOLDER_REPLEN = BASE_DIR / "output" / "REPLEN"
+OUTPUT_FOLDER_TARGETPER = BASE_DIR / "output" / "TARGETPER"  # Folder for TARGETPER output
 TASKS_FOLDER = Path(os.getenv("TASKS_FOLDER", BASE_DIR / "tasks" / "REPLEN"))
+TASKS_FOLDER_TARGETPER = TASKS_FOLDER / "TARGETPER"  # Folder for TARGETPER tasks
 
 # Create necessary folders if they don't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 UPLOAD_FOLDER_REPLEN.mkdir(parents=True, exist_ok=True)
 OUTPUT_FOLDER_REPLEN.mkdir(parents=True, exist_ok=True)
+UPLOAD_FOLDER_TARGETPER.mkdir(parents=True, exist_ok=True)
+OUTPUT_FOLDER_TARGETPER.mkdir(parents=True, exist_ok=True)
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -127,6 +132,65 @@ def run_replen():
         flash(f"Unexpected error: {str(e)}", "error")
         return render_template("index.html")
 
+@app.route("/run-target-performance", methods=["POST"])
+def run_target_performance():
+    """Handle Target Performance Task."""
+    try:
+        # Get uploaded files from the request
+        uploaded_files = request.files.getlist("target_files[]")
+
+        # Ensure both SALES.csv and TARGET.csv are uploaded
+        if len(uploaded_files) != 2:
+            flash("Please upload both SALES.csv and TARGET.csv files.", "error")
+            return render_template("index.html")
+
+        # Define the upload directory
+        target_upload_folder = os.path.join(BASE_DIR, "uploads", "TARGETPER")
+        os.makedirs(target_upload_folder, exist_ok=True)
+
+        # Save the uploaded files
+        for file in uploaded_files:
+            if file.filename in ["SALES.csv", "TARGET.csv"]:
+                file_path = os.path.join(target_upload_folder, file.filename)
+                file.save(file_path)
+            else:
+                flash(f"Invalid file: {file.filename}. Only SALES.csv and TARGET.csv are allowed.", "error")
+                return render_template("index.html")
+
+        # Define the path to the TARGETMASTER.py script
+        target_master_script = os.path.join(BASE_DIR, "tasks", "TARGETPER", "TARGETMASTER.py")
+        if not os.path.exists(target_master_script):
+            flash("Target Performance master script not found.", "error")
+            return render_template("index.html")
+
+        # Run the TARGETMASTER.py script
+        subprocess.run(
+            ["python", target_master_script],
+            check=True,
+            text=True
+        )
+
+        # Check if the final output file exists
+        target_output_file = os.path.join(BASE_DIR, "output", "TARGETPER", "TARGET PERFORMANCE.xlsx")
+        if os.path.exists(target_output_file):
+            download_link = "/download/target/output"
+            flash("Target Performance task completed successfully.", "success")
+            return render_template(
+                "index.html",
+                download_link=download_link,
+                download_name="TARGET PERFORMANCE.xlsx"  # Pass the correct file name to the template
+            )
+        else:
+            flash("Target Performance task completed, but 'TARGET PERFORMANCE.xlsx' was not generated.", "error")
+            return render_template("index.html")
+
+    except subprocess.CalledProcessError as e:
+        flash(f"Error while running Target Performance master script: {e.stderr}", "error")
+        return render_template("index.html")
+    except Exception as e:
+        flash(f"Unexpected error: {str(e)}", "error")
+        return render_template("index.html")
+
 @app.route("/download/<filename>")
 def download_file(filename):
     """Serve processed files for download."""
@@ -152,6 +216,29 @@ def download_replen_file(filename):
             return render_template("index.html")
     except Exception as e:
         flash(f"Unexpected error: {str(e)}", "error")
+        return render_template("index.html")
+
+@app.route("/download/target/output", methods=["GET"])
+def download_target_performance_file():
+    """Serve the final TARGET PERFORMANCE.xlsx file for download."""
+    try:
+        # Construct the full path to the final output file dynamically
+        target_output_file = os.path.join(OUTPUT_FOLDER, "TARGETPER", "TARGET PERFORMANCE.xlsx")
+
+        # Check if the file exists
+        if os.path.exists(target_output_file):
+            return send_file(
+                target_output_file,
+                as_attachment=True,
+                download_name="TARGET PERFORMANCE.xlsx"  # Explicit download name
+            )
+        else:
+            # Handle case when the output file is missing
+            flash("Final output file 'TARGET PERFORMANCE.xlsx' not found.", "error")
+            return render_template("index.html")
+    except Exception as e:
+        # Handle unexpected errors
+        flash(f"Unexpected error while serving the output file: {str(e)}", "error")
         return render_template("index.html")
 
 @app.route("/run-checkempty", methods=["POST"])

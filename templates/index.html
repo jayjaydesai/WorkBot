@@ -180,6 +180,14 @@
                 checkEmptyInputs.querySelectorAll("input").forEach(input => {
                     input.disabled = false;
                 });
+           } else if (task === "target_performance") {
+               form.action = "/run-target-performance"; // Backend route for Target Performance
+               const targetInputs = document.getElementById("target-performance-inputs");
+               targetInputs.style.display = "block";
+               targetInputs.querySelectorAll("input").forEach(input => {
+                    input.disabled = false;
+                });
+
             } else {
                 form.action = "#";
             }
@@ -235,7 +243,9 @@ function hideProcessingOverlay() {
             <h2>Task Completed Successfully</h2>
             <p>Your output file is ready:</p>
             <div class="button-container">
-                <a href="{{ download_link }}" target="_blank" style="text-decoration: none; padding: 10px 20px; background-color: #28a745; color: white; border-radius: 5px;">Download OUTPUT28.xlsx</a>
+                <a href="{{ download_link }}" target="_blank" style="text-decoration: none; padding: 10px 20px; background-color: #28a745; color: white;    border-radius: 5px;">
+                Download {{ download_name }}
+                </a>
                 <a href="/" style="text-decoration: none; padding: 10px 20px; background-color: #007bff; color: white; border-radius: 5px;">Back to Home</a>
             </div>
         {% else %}
@@ -249,6 +259,7 @@ function hideProcessingOverlay() {
                         <option value="bulk_report">Bulk Report</option>
                         <option value="replen_stock">Replen Stock</option>
                         <option value="check_empty_location">Check Empty Location</option>
+                        <option value="target_performance">Target Performance Analysis</option> <!-- NEW OPTION -->
                     </select>
                 </div>
 
@@ -275,6 +286,13 @@ function hideProcessingOverlay() {
                     <p style="font-size: 0.9em; color: #555;">Upload the latest BULK.xlsx file to identify empty locations.</p>
                 </div>
 
+               <!-- Target Performance Inputs -->
+               <div id="target-performance-inputs" class="task-inputs">
+                   <label for="file-targets">Upload SALES.csv and TARGET.csv:</label>
+                   <input type="file" name="target_files[]" id="file-targets" accept=".csv" multiple required>
+                   <p class="file-instructions">Upload both SALES.csv and TARGET.csv files for processing.</p>
+               </div>
+
                 <!-- Submit Button -->
                 <button type="submit" onclick="showProcessingOverlay()">Process Task</button>
             </form>
@@ -296,3 +314,4 @@ function hideProcessingOverlay() {
 </div>
 </body>
 </html>
+
