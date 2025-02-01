@@ -13,7 +13,7 @@
             color: #333;
         }
         header {
-            background-color: #007bff;
+            background-color: #1F4E78;
             color: white;
             padding: 20px 0;
             text-align: center;
@@ -42,7 +42,7 @@
             width: 100%;
         }
         button {
-            background-color: #007bff;
+            background-color: #1F4E78;
             color: white;
             border: none;
             cursor: pointer;
@@ -144,6 +144,21 @@
     margin-top: 20px;
     font-style: italic;
 }
+
+#stopwatch-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #1F4E78; /* Dark Blue */
+    color: #FFFF00; /* Yellow */
+    font-weight: bold;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 1.2em;
+    display: none; /* Initially hidden */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
     </style>
     <script>
         function toggleInputs() {
@@ -187,13 +202,54 @@
                targetInputs.querySelectorAll("input").forEach(input => {
                     input.disabled = false;
                 });
+           } else if (task === "replen_backorder_greece") {
+               form.action = "/run-replen-backorder-greece";  // New backend route
+               const replenBackorderInputs = document.getElementById("replen-backorder-greece-inputs");
+               replenBackorderInputs.style.display = "block";
+               replenBackorderInputs.querySelectorAll("input").forEach(input => {
+                    input.disabled = false;
+                });
 
             } else {
                 form.action = "#";
             }
         }
 
-        // Show the processing overlay and start the progress adventure
+// Validate if a file is selected before form submission
+function validateForm() {
+    const task = document.getElementById("task").value;
+
+    // Get all file input fields that are currently enabled
+    let fileInputs = document.querySelectorAll(".task-inputs:not([style*='display: none']) input[type='file']");
+
+    let hasFile = false;
+    fileInputs.forEach(input => {
+        if (input.files.length > 0) {
+            hasFile = true;
+        }
+    });
+
+    if (!hasFile) {
+        showWarningModal(); // Show custom modal instead of alert()
+        return false; // Prevent form submission
+    }
+
+    // If files are selected, show processing overlay
+    showProcessingOverlay();
+    return true; // Allow form submission
+}
+
+// Function to Show the Warning Modal
+function showWarningModal() {
+    document.getElementById("warning-modal").style.display = "flex";
+}
+
+// Function to Close the Warning Modal
+function closeWarningModal() {
+    document.getElementById("warning-modal").style.display = "none";
+}
+
+       // Show the processing overlay and start the progress adventure
 function showProcessingOverlay() {
     const overlay = document.getElementById("processing-overlay");
     const progressFill = document.getElementById("progress-fill");
@@ -220,11 +276,56 @@ function hideProcessingOverlay() {
 }
 
     </script>
+<style>
+    /* Centered Warning Modal */
+    .modal {
+        display: none; /* Hidden by default */
+        position: fixed;
+        z-index: 1000; /* Ensure it appears on top */
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent background */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Modal Content */
+    .modal-content {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+        width: 300px;
+    }
+
+    /* OK Button */
+    .modal-content button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        margin-top: 10px;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+    .modal-content button:hover {
+        background-color: #0056b3;
+    }
+</style>
 </head>
 <body>
     <header>
         <h1>ProcessHub</h1>
     </header>
+
+    <div id="stopwatch-container" style="display: none;">
+    Processing Time: <span id="stopwatch">00:00:00:000</span>
+    </div>
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -238,17 +339,43 @@ function hideProcessingOverlay() {
     {% endwith %}
 
     <main>
-        {% if download_link %}
-            <!-- Display Download Link -->
+         {% if download_link1 and download_link2 %}
+          <script> stopStopwatch(); </script>
+            <!-- GREPLEN Task: Display Two Download Links -->
+            <h2>Replen Backorder Greece Task Completed Successfully</h2>
+            <p>Your output files are ready:</p>
+            <div class="button-container">
+                <a href="{{ download_link1 }}" target="_blank" style="text-decoration: none; padding: 10px 20px; background-color: #28a745; color: white;    border-radius: 5px;">
+                   Download FINAL_GR_BO_EXPORT.xlsx
+                </a>
+                <a href="{{ download_link2 }}" target="_blank" style="text-decoration: none; padding: 10px 20px; background-color: #007bff; color: white; border-radius: 5px;">
+                   Download WORKING.xlsx
+                </a>
+                <a href="/" id="back-to-home" style="text-decoration: none; padding: 10px 20px; background-color: #f39c12; color: white; border-radius:  5px;">
+                Back to Home
+            </a>
+            </div>
+
+         {% elif download_link %}
+            <script> stopStopwatch(); </script>
+            <!-- For All Other Tasks: Display Single Download Link -->
             <h2>Task Completed Successfully</h2>
             <p>Your output file is ready:</p>
+
+            <!-- Display Stopwatch Processing Time -->
+            <div id="stopwatch-container">
+                 Processing Completed in <span id="stopwatch"></span>
+           </div>
             <div class="button-container">
-                <a href="{{ download_link }}" target="_blank" style="text-decoration: none; padding: 10px 20px; background-color: #28a745; color: white;    border-radius: 5px;">
-                Download {{ download_name }}
+                <a href="{{ download_link }}" target="_blank" style="text-decoration: none; padding: 10px 20px; background-color: #28a745; color: white; border-radius: 5px;">
+                   Download {{ download_name }}
                 </a>
-                <a href="/" style="text-decoration: none; padding: 10px 20px; background-color: #007bff; color: white; border-radius: 5px;">Back to Home</a>
+                <a href="/" style="text-decoration: none; padding: 10px 20px; background-color: #007bff; color: white; border-radius: 5px;">
+                    Back to Home
+                </a>
             </div>
         {% else %}
+
             <!-- Display Task Selection Form -->
             <form id="task-form" method="post" enctype="multipart/form-data" action="#">
                 <!-- Task Selection -->
@@ -259,7 +386,8 @@ function hideProcessingOverlay() {
                         <option value="bulk_report">Bulk Report</option>
                         <option value="replen_stock">Replen Stock</option>
                         <option value="check_empty_location">Check Empty Location</option>
-                        <option value="target_performance">Target Performance Analysis</option> <!-- NEW OPTION -->
+                        <option value="target_performance">Target Performance Analysis</option>
+                        <option value="replen_backorder_greece">Replen Backorder Greece</option>
                     </select>
                 </div>
 
@@ -293,8 +421,19 @@ function hideProcessingOverlay() {
                    <p class="file-instructions">Upload both SALES.csv and TARGET.csv files for processing.</p>
                </div>
 
+               <!-- Replen Backorder Greece Inputs -->
+               <div id="replen-backorder-greece-inputs" class="task-inputs">
+                   <label for="file-master">Upload MASTER.csv:</label>
+                   <input type="file" name="replen_backorder_files[]" id="file-master" accept=".csv" required>
+                   <p class="file-instructions">Upload the MASTER.csv file with required data.</p>
+
+                   <label for="file-po">Upload PO.csv:</label>
+                   <input type="file" name="replen_backorder_files[]" id="file-po" accept=".csv" required>
+                   <p class="file-instructions">Upload the PO.csv file containing purchase order data.</p>
+              </div>
+
                 <!-- Submit Button -->
-                <button type="submit" onclick="showProcessingOverlay()">Process Task</button>
+                <button type="submit" id="process-task-btn">Process Task</button>
             </form>
         {% endif %}
     </main>
@@ -312,6 +451,137 @@ function hideProcessingOverlay() {
         <p class="processing-quote"> Your request is being processed—just moments away! 🚀</p>
     </div>
 </div>
+<!-- Custom Warning Modal -->
+<div id="warning-modal" class="modal">
+    <div class="modal-content">
+        <p>⚠️ Please select the required file(s) before processing.</p>
+        <button onclick="closeWarningModal()">OK</button>
+    </div>
+</div>
+
+<script>
+// Stopwatch Variables
+let stopwatchInterval;
+let startTime;
+
+// Function to Start Stopwatch
+function startStopwatch() {
+    clearInterval(stopwatchInterval); // Reset if already running
+    startTime = performance.now();
+    sessionStorage.setItem("stopwatchStart", startTime); // Save start time
+
+    document.getElementById("stopwatch-container").style.display = "block"; // Show Stopwatch
+    updateStopwatch();
+
+    stopwatchInterval = setInterval(updateStopwatch, 10);
+}
+
+// Function to Update Stopwatch (Runs Every 10ms)
+function updateStopwatch() {
+    if (!startTime) return;
+
+    let elapsedTime = performance.now() - startTime;
+    let ms = Math.floor(elapsedTime % 1000);
+    let seconds = Math.floor((elapsedTime / 1000) % 60);
+    let minutes = Math.floor((elapsedTime / (1000 * 60)) % 60);
+    let hours = Math.floor((elapsedTime / (1000 * 60 * 60)) % 24);
+
+    let formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}:${String(ms).padStart(3, '0')}`;
+    document.getElementById("stopwatch").innerText = formattedTime;
+
+    // Store Stopwatch Time to Persist Across Pages
+    sessionStorage.setItem("stopwatchRunningTime", formattedTime);
+}
+
+// Function to Stop Stopwatch and Store Final Time
+function stopStopwatch() {
+    clearInterval(stopwatchInterval);
+
+    let finalTime = document.getElementById("stopwatch").innerText;
+    sessionStorage.setItem("finalStopwatchTime", finalTime); // Save final time
+
+    document.getElementById("stopwatch-container").innerHTML =
+        `Processing Completed in <span id="stopwatch">${finalTime}</span>`;
+    document.getElementById("stopwatch-container").style.display = "block";
+}
+
+// Restore Stopwatch Time on Download Page
+function restoreStopwatchTime() {
+    let savedTime = sessionStorage.getItem("finalStopwatchTime");
+
+    if (savedTime) {
+        document.getElementById("stopwatch-container").innerHTML =
+            `Processing Completed in <span id="stopwatch">${savedTime}</span>`;
+        document.getElementById("stopwatch-container").style.display = "block";
+    }
+}
+
+// Validate Form Before Submission
+function validateForm() {
+    // If the page has a download link, don't validate file selection
+    if (document.getElementById("download-section")) {
+        return true;
+    }
+
+    const task = document.getElementById("task")?.value;
+    let fileInputs = document.querySelectorAll(".task-inputs:not([style*='display: none']) input[type='file']");
+    let hasFile = false;
+
+    fileInputs.forEach(input => {
+        if (input.files.length > 0) {
+            hasFile = true;
+        }
+    });
+
+    // If required files are missing, show the warning modal and prevent submission
+    if (!hasFile) {
+        showWarningModal();
+        return false; // Prevent form submission
+    }
+
+    startStopwatch(); // Start stopwatch when process begins
+    showProcessingOverlay(); // Show processing overlay
+    return true; // Allow form submission
+}
+
+// Ensure Stopwatch Appears on Download Page
+document.addEventListener("DOMContentLoaded", function () {
+    restoreStopwatchTime(); // Restore stopwatch time when page loads
+
+    if (document.getElementById("download-section")) {
+        stopStopwatch(); // Ensure Stopwatch Time is Displayed on Download Page
+    }
+
+    let processTaskBtn = document.getElementById("process-task-btn");
+    if (processTaskBtn) {
+        processTaskBtn.addEventListener("click", function (event) {
+            if (!validateForm()) {
+                event.preventDefault(); // Stop submission if files are missing
+            }
+        });
+    }
+
+    // Reset Stopwatch when Clicking "Back to Home"
+    let backToHomeButton = document.getElementById("back-to-home");
+    if (backToHomeButton) {
+        backToHomeButton.addEventListener("click", function () {
+            hideProcessingOverlay();
+            closeWarningModal();
+            sessionStorage.removeItem("finalStopwatchTime"); // Reset stopwatch
+            sessionStorage.removeItem("stopwatchRunningTime"); // Clear Running Time
+        });
+    }
+
+    // Hide warning modal on refresh or navigation back
+    window.onload = function () {
+        closeWarningModal();
+    };
+
+    window.addEventListener("pageshow", function () {
+        closeWarningModal();
+    });
+});
+</script>
 </body>
 </html>
 

@@ -20,11 +20,14 @@ load_dotenv()
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
 UPLOAD_FOLDER_REPLEN = BASE_DIR / "uploads" / "REPLEN"
 UPLOAD_FOLDER_TARGETPER = BASE_DIR / "uploads" / "TARGETPER"  # Folder for TARGETPER uploads
+UPLOAD_FOLDER_GREPLEN = BASE_DIR / "uploads" / "GREPLEN"  # Folder for GREPLEN uploads
 OUTPUT_FOLDER = os.getenv("OUTPUT_FOLDER", "output")
 OUTPUT_FOLDER_REPLEN = BASE_DIR / "output" / "REPLEN"
 OUTPUT_FOLDER_TARGETPER = BASE_DIR / "output" / "TARGETPER"  # Folder for TARGETPER output
+OUTPUT_FOLDER_GREPLEN = BASE_DIR / "output" / "GREPLEN"  # Folder for GREPLEN output
 TASKS_FOLDER = Path(os.getenv("TASKS_FOLDER", BASE_DIR / "tasks" / "REPLEN"))
 TASKS_FOLDER_TARGETPER = TASKS_FOLDER / "TARGETPER"  # Folder for TARGETPER tasks
+TASKS_FOLDER_GREPLEN = BASE_DIR / "tasks" / "GREPLEN"  # Folder for GREPLEN tasks
 
 # Create necessary folders if they don't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -33,6 +36,8 @@ UPLOAD_FOLDER_REPLEN.mkdir(parents=True, exist_ok=True)
 OUTPUT_FOLDER_REPLEN.mkdir(parents=True, exist_ok=True)
 UPLOAD_FOLDER_TARGETPER.mkdir(parents=True, exist_ok=True)
 OUTPUT_FOLDER_TARGETPER.mkdir(parents=True, exist_ok=True)
+UPLOAD_FOLDER_GREPLEN.mkdir(parents=True, exist_ok=True)
+OUTPUT_FOLDER_GREPLEN.mkdir(parents=True, exist_ok=True)
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -191,6 +196,70 @@ def run_target_performance():
         flash(f"Unexpected error: {str(e)}", "error")
         return render_template("index.html")
 
+@app.route("/run-replen-backorder-greece", methods=["POST"])
+def run_replen_backorder_greece():
+    """Handle Replen Backorder Greece Task."""
+    try:
+        # Get uploaded files
+        uploaded_files = request.files.getlist("replen_backorder_files[]")
+
+        # Ensure both MASTER.csv and PO.csv are uploaded
+        if len(uploaded_files) != 2:
+            flash("Please upload both MASTER.csv and PO.csv files.", "error")
+            return render_template("index.html")
+
+        # Define upload directory
+        greplen_upload_folder = os.path.join(BASE_DIR, "uploads", "GREPLEN")
+        os.makedirs(greplen_upload_folder, exist_ok=True)
+
+        # Save uploaded files
+        for file in uploaded_files:
+            if file.filename in ["MASTER.csv", "PO.csv"]:
+                file_path = os.path.join(greplen_upload_folder, file.filename)
+                file.save(file_path)
+            else:
+                flash(f"Invalid file: {file.filename}. Only MASTER.csv and PO.csv are allowed.", "error")
+                return render_template("index.html")
+
+        # Run GREPLEN_MASTER.py script
+        greplen_master_script = os.path.join(BASE_DIR, "tasks", "GREPLEN", "GREPLEN_MASTER.py")
+        if not os.path.exists(greplen_master_script):
+            flash("Replen Backorder Greece master script not found.", "error")
+            return render_template("index.html")
+
+        subprocess.run(["python", greplen_master_script], check=True, text=True)
+
+        # Check if the final output file exists
+        greplen_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "FINAL_GR_BO_EXPORT.xlsx")
+        working_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "WORKING.xlsx")
+
+        missing_files = []
+        if not os.path.exists(greplen_output_file):
+           missing_files.append("'FINAL_GR_BO_EXPORT.xlsx'")
+        if not os.path.exists(working_output_file):
+           missing_files.append("'WORKING.xlsx'")
+
+        if missing_files:
+            flash(f"Replen Backorder Greece task completed, but {', '.join(missing_files)} was not generated.", "error")
+            return render_template("index.html")
+
+        download_link1 = "/download/greplen/FINAL_GR_BO_EXPORT"
+        download_link2 = "/download/greplen/WORKING_GR_BO_EXPORT"
+            
+        flash("Replen Backorder Greece task completed successfully.", "success")
+        return render_template(
+            "index.html",
+            download_link1=download_link1,
+            download_link2=download_link2
+        )
+
+    except subprocess.CalledProcessError as e:
+        flash(f"Error while running Replen Backorder Greece master script: {e.stderr}", "error")
+        return render_template("index.html")
+    except Exception as e:
+        flash(f"Unexpected error: {str(e)}", "error")
+        return render_template("index.html")
+
 @app.route("/download/<filename>")
 def download_file(filename):
     """Serve processed files for download."""
@@ -302,6 +371,41 @@ def run_checkempty():
         <pre>{str(e)}</pre>
         <br><a href="/" style="text-decoration:none; padding:10px; background-color:red; color:white; border-radius:5px;">Back to Home</a>
         """
+
+@app.route("/download/greplen/FINAL_GR_BO_EXPORT", methods=["GET"])
+def download_greplen_output_file():
+    """Serve the final FINAL_GR_BO_EXPORT.xlsx file for download."""
+    try:
+        # Path to the final output file
+        greplen_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "FINAL_GR_BO_EXPORT.xlsx")
+
+        # Check if the file exists
+        if os.path.exists(greplen_output_file):
+            return send_file(greplen_output_file, as_attachment=True, download_name="FINAL_GR_BO_EXPORT.xlsx")
+        else:
+            flash("Final output file 'FINAL_GR_BO_EXPORT.xlsx' not found.", "error")
+            return render_template("index.html")
+    except Exception as e:
+        flash(f"Unexpected error while serving the output file: {str(e)}", "error")
+        return render_template("index.html")
+
+@app.route("/download/greplen/WORKING_GR_BO_EXPORT", methods=["GET"])
+def download_greplen_working_file():
+    """Serve the WORKING.xlsx file for download."""
+    try:
+        # Path to the WORKING output file
+        working_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "WORKING.xlsx")
+
+        # Check if the file exists
+        if os.path.exists(working_output_file):
+            return send_file(working_output_file, as_attachment=True, download_name="WORKING.xlsx")
+        else:
+            flash("Final output file 'WORKING.xlsx' not found.", "error")
+            return render_template("index.html")
+    except Exception as e:
+        flash(f"Unexpected error while serving the output file: {str(e)}", "error")
+        return render_template("index.html")
+
 
 if __name__ == "__main__":
     app.run(debug=True)
