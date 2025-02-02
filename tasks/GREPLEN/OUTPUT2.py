@@ -1,30 +1,55 @@
 import os
 import pandas as pd
+import sys
 
-# Define dynamic paths for local and Azure
-BASE_DIR = os.getenv("BASE_DIR", os.path.join("C:", os.sep, "Users", "jaydi", "OneDrive - Comline", 
-                                              "CAPLOCATION", "Deployment", "bulk_report_webapp"))
+# Ensure UTF-8 output encoding to avoid UnicodeEncodeError
+sys.stdout.reconfigure(encoding='utf-8')
+
+# Define dynamic paths for local and Azure compatibility
+BASE_DIR = os.getenv("BASE_DIR")  # Use Azure variable if available
+
+if not BASE_DIR:  # If not set, find the correct project root
+    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 OUTPUT_PATH = os.path.join(BASE_DIR, "output", "GREPLEN")
+
+# Debugging: Print paths to check correctness
+print(f"🔍 DEBUG: BASE_DIR is set to: {BASE_DIR}")
+print(f"🔍 DEBUG: Looking for OUTPUT1.csv at: {OUTPUT_PATH}")
+
+# Ensure required directories exist
+os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 # Define file paths
 output1_file = os.path.join(OUTPUT_PATH, "OUTPUT1.csv")
 output2_file = os.path.join(OUTPUT_PATH, "OUTPUT2.csv")
 
-# Ensure OUTPUT1.csv exists
-if not os.path.exists(output1_file):
-    raise FileNotFoundError(f"OUTPUT1.csv not found in {OUTPUT_PATH}")
+try:
+    # Ensure OUTPUT1.csv exists
+    if not os.path.exists(output1_file):
+        raise FileNotFoundError(f"❌ ERROR: OUTPUT1.csv not found in {OUTPUT_PATH}")
 
-# Load OUTPUT1.csv
-df = pd.read_csv(output1_file)
+    # Load OUTPUT1.csv with UTF-8 encoding
+    df = pd.read_csv(output1_file, encoding="utf-8")
 
-# Check if "date" column exists
-if "date" not in df.columns:
-    raise KeyError(f"'date' column not found in OUTPUT1.csv. Available columns: {list(df.columns)}")
+    # Convert column names to lowercase for case-insensitive checks
+    df.columns = [col.lower().strip() for col in df.columns]
 
-# Convert "date" column to datetime format (dd-mm-yyyy)
-df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%d-%m-%Y")
+    # Ensure "date" column exists
+    if "date" not in df.columns:
+        raise KeyError(f"❌ ERROR: 'date' column not found in OUTPUT1.csv. Available columns: {list(df.columns)}")
 
-# Save processed file
-df.to_csv(output2_file, index=False)
+    # Convert "date" column to datetime format (dd-mm-yyyy)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%d-%m-%Y")
 
-print(f"SUCCESS: OUTPUT2.csv generated at {output2_file}")
+    # Save processed file with UTF-8 encoding
+    df.to_csv(output2_file, index=False, encoding="utf-8")
+
+    print(f"✅ SUCCESS: OUTPUT2.csv generated at {output2_file}")
+
+except FileNotFoundError as e:
+    print(f"❌ ERROR: {e}")
+except pd.errors.EmptyDataError:
+    print("❌ ERROR: OUTPUT1.csv is empty or corrupted.")
+except Exception as e:
+    print(f"❌ UNEXPECTED ERROR: {str(e)}")

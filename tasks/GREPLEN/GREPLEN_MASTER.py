@@ -1,11 +1,19 @@
 import os
 import subprocess
+import sys
 
-# Define base paths dynamically
-BASE_DIR = os.getenv("BASE_DIR", os.path.join("C:", os.sep, "Users", "jaydi", "OneDrive - Comline", "CAPLOCATION", "Deployment", "bulk_report_webapp"))
+# Ensure UTF-8 output encoding to avoid UnicodeEncodeError
+sys.stdout.reconfigure(encoding='utf-8')
+
+# Define base paths dynamically for Local & Azure compatibility
+BASE_DIR = os.getenv("BASE_DIR", os.getcwd())  # Use Azure variable or current directory
 UPLOAD_PATH = os.path.join(BASE_DIR, "uploads", "GREPLEN")
 OUTPUT_PATH = os.path.join(BASE_DIR, "output", "GREPLEN")
-TASKS_PATH = os.path.join(BASE_DIR, "tasks", "GREPLEN")
+TASKS_PATH = os.path.abspath(os.path.dirname(__file__))  # Fix path to current directory
+
+# Debugging: Print paths to check correctness
+print(f"🔍 DEBUG: TASKS_PATH is set to: {TASKS_PATH}")
+print(f"🔍 DEBUG: Looking for scripts in: {TASKS_PATH}")
 
 # Ensure required folders exist
 os.makedirs(UPLOAD_PATH, exist_ok=True)
@@ -13,30 +21,30 @@ os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 # Complete list of scripts in order
 scripts = [
-    "OUTPUT1.py", "OUTPUT2.py", "OUTPUT3.py", "OUTPUT4.py", "OUTPUT5.py",
-    "OUTPUT6.py", "OUTPUT7.py", "OUTPUT8.py", "OUTPUT9.py", "OUTPUT10.py",
-    "OUTPUT11.py", "OUTPUT12.py", "OUTPUT13.py", "OUTPUT14.py", "OUTPUT15.py",
-    "OUTPUT16.py", "OUTPUT17.py", "OUTPUT18.py", "OUTPUT19.py", "OUTPUT20.py",
-    "OUTPUT21.py", "OUTPUT22.py", "OUTPUT23.py", "OUTPUT24.py", "OUTPUT25.py",
-    "OUTPUT26.py", "OUTPUT27.py"
+    "OUTPUT1.py", "OUTPUT2.py", "OUTPUT3.py"
 ]
 
 try:
-    print("\n✅ Starting Replen Backorder Greece Processing...\n")
+    print("\n\033[96m✅ Starting Replen Backorder Greece Processing...\033[0m\n")  # Cyan color
 
     for script in scripts:
         script_path = os.path.join(TASKS_PATH, script)
 
         if os.path.exists(script_path):
-            print(f"▶ Running {script}...")
-            result = subprocess.run(["python", script_path], check=True, text=True, capture_output=True)
-            print(result.stdout)  # Print script output
-        else:
-            print(f"❌ WARNING: {script} not found. Skipping...")
+            print(f"▶ Running {script}...")  # Show script name before execution
 
-    print("\n🎉 Replen Backorder Greece Processing Completed Successfully!\n")
+            # Execute script and capture output
+            result = subprocess.run(["python", script_path], check=True, capture_output=True, text=True)
+
+            print(f"\033[92m✅ {script} completed successfully!\033[0m")  # Green for success
+            if result.stdout:
+                print(f"\033[90m{result.stdout.strip()}\033[0m")  # Gray for script output
+        else:
+            print(f"\033[93m❌ WARNING: {script} not found. Skipping...\033[0m")  # Yellow for warnings
+
+    print("\n\033[92m🎉 Replen Backorder Greece Processing Completed Successfully!\033[0m\n")
 
 except subprocess.CalledProcessError as e:
-    print(f"\n❌ ERROR: Script execution failed - {e.stderr}\n")
+    print(f"\n\033[91m❌ ERROR in {script}: {e.stderr.strip()}\033[0m\n")  # Red for script failure
 except Exception as e:
-    print(f"\n❌ UNEXPECTED ERROR: {str(e)}\n")
+    print(f"\n\033[91m❌ UNEXPECTED ERROR: {str(e)}\033[0m\n")  # Red for unexpected errors

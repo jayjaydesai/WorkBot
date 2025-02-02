@@ -230,14 +230,14 @@ def run_replen_backorder_greece():
         subprocess.run(["python", greplen_master_script], check=True, text=True)
 
         # Check if the final output file exists
-        greplen_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "FINAL_GR_BO_EXPORT.xlsx")
-        working_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "WORKING.xlsx")
+        greplen_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "OUTPUT3.csv")
+        working_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "OUTPUT2.csv")
 
         missing_files = []
         if not os.path.exists(greplen_output_file):
-           missing_files.append("'FINAL_GR_BO_EXPORT.xlsx'")
+           missing_files.append("'OUTPUT3.csv'")
         if not os.path.exists(working_output_file):
-           missing_files.append("'WORKING.xlsx'")
+           missing_files.append("'OUTPUT2.csv'")
 
         if missing_files:
             flash(f"Replen Backorder Greece task completed, but {', '.join(missing_files)} was not generated.", "error")
@@ -374,16 +374,16 @@ def run_checkempty():
 
 @app.route("/download/greplen/FINAL_GR_BO_EXPORT", methods=["GET"])
 def download_greplen_output_file():
-    """Serve the final FINAL_GR_BO_EXPORT.xlsx file for download."""
+    """Serve the final OUTPUT3.cvs file for download."""
     try:
         # Path to the final output file
-        greplen_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "FINAL_GR_BO_EXPORT.xlsx")
+        greplen_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "OUTPUT3.csv")
 
         # Check if the file exists
         if os.path.exists(greplen_output_file):
-            return send_file(greplen_output_file, as_attachment=True, download_name="FINAL_GR_BO_EXPORT.xlsx")
+            return send_file(greplen_output_file, as_attachment=True, download_name="OUTPUT3.csv")
         else:
-            flash("Final output file 'FINAL_GR_BO_EXPORT.xlsx' not found.", "error")
+            flash("Final output file 'OUTPUT3.csv' not found.", "error")
             return render_template("index.html")
     except Exception as e:
         flash(f"Unexpected error while serving the output file: {str(e)}", "error")
@@ -391,16 +391,16 @@ def download_greplen_output_file():
 
 @app.route("/download/greplen/WORKING_GR_BO_EXPORT", methods=["GET"])
 def download_greplen_working_file():
-    """Serve the WORKING.xlsx file for download."""
+    """Serve the OUTPUT2.csv file for download."""
     try:
         # Path to the WORKING output file
-        working_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "WORKING.xlsx")
+        working_output_file = os.path.join(BASE_DIR, "output", "GREPLEN", "OUTPUT2.csv")
 
         # Check if the file exists
         if os.path.exists(working_output_file):
-            return send_file(working_output_file, as_attachment=True, download_name="WORKING.xlsx")
+            return send_file(working_output_file, as_attachment=True, download_name="OUTPUT2.csv")
         else:
-            flash("Final output file 'WORKING.xlsx' not found.", "error")
+            flash("Final output file 'OUTPUT2.csv' not found.", "error")
             return render_template("index.html")
     except Exception as e:
         flash(f"Unexpected error while serving the output file: {str(e)}", "error")
