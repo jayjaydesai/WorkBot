@@ -19,9 +19,14 @@ print(f"🔍 DEBUG: Looking for scripts in: {TASKS_PATH}")
 os.makedirs(UPLOAD_PATH, exist_ok=True)
 os.makedirs(OUTPUT_PATH, exist_ok=True)
 
-# Complete list of scripts in order
+# ✅ Complete list of scripts in execution order
 scripts = [
-    "OUTPUT1.py", "OUTPUT2.py", "OUTPUT3.py"
+    "OUTPUT1.py", "OUTPUT2.py", "OUTPUT3.py", "OUTPUT4.py", "OUTPUT5.py",
+    "OUTPUT6.py", "OUTPUT7.py", "OUTPUT8.py", "OUTPUT9.py", "OUTPUT10.py",
+    "OUTPUT11.py", "OUTPUT12.py", "OUTPUT13.py", "OUTPUT14.py", "OUTPUT15.py",
+    "OUTPUT16.py", "OUTPUT17.py", "OUTPUT18.py", "OUTPUT19.py", "OUTPUT20.py",
+    "OUTPUT21.py", "OUTPUT22.py", "OUTPUT23.py", "OUTPUT24.py", "OUTPUT25.py",
+    "OUTPUT26.py", "OUTPUT27.py"
 ]
 
 try:
@@ -33,12 +38,16 @@ try:
         if os.path.exists(script_path):
             print(f"▶ Running {script}...")  # Show script name before execution
 
-            # Execute script and capture output
+            # Execute script and capture both output & errors
             result = subprocess.run(["python", script_path], check=True, capture_output=True, text=True)
 
             print(f"\033[92m✅ {script} completed successfully!\033[0m")  # Green for success
+            
+            # Print script output for debugging
             if result.stdout:
                 print(f"\033[90m{result.stdout.strip()}\033[0m")  # Gray for script output
+            if result.stderr:
+                print(f"\033[91m{result.stderr.strip()}\033[0m")  # Red for errors
         else:
             print(f"\033[93m❌ WARNING: {script} not found. Skipping...\033[0m")  # Yellow for warnings
 

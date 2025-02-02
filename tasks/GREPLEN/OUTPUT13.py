@@ -2,9 +2,14 @@ import os
 import pandas as pd
 
 # Define dynamic paths for local and Azure compatibility
-BASE_DIR = os.getenv("BASE_DIR", os.path.join("C:", os.sep, "Users", "jaydi", "OneDrive - Comline", 
-                                              "CAPLOCATION", "Deployment", "bulk_report_webapp"))
+BASE_DIR = os.getenv("BASE_DIR")  # Use Azure variable if available
+if not BASE_DIR:
+    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 OUTPUT_PATH = os.path.join(BASE_DIR, "output", "GREPLEN")
+
+# Ensure required directories exist
+os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 # Define file paths
 output12_file = os.path.join(OUTPUT_PATH, "OUTPUT12.csv")

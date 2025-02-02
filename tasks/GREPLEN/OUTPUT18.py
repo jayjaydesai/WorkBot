@@ -2,9 +2,14 @@ import os
 import pandas as pd
 
 # Define dynamic paths for local and Azure compatibility
-BASE_DIR = os.getenv("BASE_DIR", os.path.join("C:", os.sep, "Users", "jaydi", "OneDrive - Comline", 
-                                              "CAPLOCATION", "Deployment", "bulk_report_webapp"))
+BASE_DIR = os.getenv("BASE_DIR")
+if not BASE_DIR:
+    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 OUTPUT_PATH = os.path.join(BASE_DIR, "output", "GREPLEN")
+
+# Ensure required directories exist
+os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 # Define file paths
 output17_file = os.path.join(OUTPUT_PATH, "OUTPUT17.csv")
@@ -17,17 +22,20 @@ if not os.path.exists(output17_file):
 # Load the source file
 df = pd.read_csv(output17_file)
 
-# Ensure necessary columns exist
-required_columns = ["note", "balance/actual/stock", "actual/stock"]
+# Convert column names to lowercase for case-insensitive handling
+df.columns = [col.lower().strip() for col in df.columns]
+
+# Ensure required columns exist
+required_columns = ["note", "balance/actual/stock"]
 for col in required_columns:
     if col not in df.columns:
-        raise KeyError(f"ERROR: Required column '{col}' not found in OUTPUT17.csv")
+        raise KeyError(f"ERROR: Missing required column '{col}' in OUTPUT17.csv. Available columns: {list(df.columns)}")
 
 # Ensure "note" column exists and replace NaN with blank
 df["note"] = df["note"].fillna("").astype(str).str.strip()
 
 # Convert "balance/actual/stock" to numeric (handle errors)
-df["balance/actual/stock"] = pd.to_numeric(df["balance/actual/stock"], errors="coerce")
+df["balance/actual/stock"] = pd.to_numeric(df["balance/actual/stock"], errors="coerce").fillna(0)
 
 # Apply filter conditions:
 # 1. "note" is blank

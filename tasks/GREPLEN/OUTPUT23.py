@@ -2,9 +2,14 @@ import os
 import pandas as pd
 
 # Define dynamic paths for local and Azure compatibility
-BASE_DIR = os.getenv("BASE_DIR", os.path.join("C:", os.sep, "Users", "jaydi", "OneDrive - Comline", 
-                                              "CAPLOCATION", "Deployment", "bulk_report_webapp"))
+BASE_DIR = os.getenv("BASE_DIR")
+if not BASE_DIR:
+    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 OUTPUT_PATH = os.path.join(BASE_DIR, "output", "GREPLEN")
+
+# Ensure required directories exist
+os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 # Define file paths
 output22_file = os.path.join(OUTPUT_PATH, "OUTPUT22.csv")
@@ -15,9 +20,12 @@ if not os.path.exists(output22_file):
     raise FileNotFoundError(f"ERROR: OUTPUT22.csv not found in {OUTPUT_PATH}")
 
 # Load the source file
-df = pd.read_csv(output22_file)
+df = pd.read_csv(output22_file, dtype=str)
 
-# Desired column sequence
+# Convert column names to uppercase for consistency
+df.columns = [col.upper().strip() for col in df.columns]
+
+# Define the desired column sequence
 column_order = [
     "REC ID", "DATE", "DESCRIPTION", "DOCUMENT NO", "COMPANY NAME", 
     "PART NUMBER", "UNIT PRICE", "QTY", "PRIORITY CODE", "PRSYPAPPSEC", 
