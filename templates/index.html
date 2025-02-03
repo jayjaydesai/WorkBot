@@ -342,7 +342,7 @@ function hideProcessingOverlay() {
          {% if download_link1 and download_link2 %}
           <script> stopStopwatch(); </script>
             <!-- GREPLEN Task: Display Two Download Links -->
-            <h2>Replen Backorder Greece Task Completed Successfully</h2>
+            <h2>Replen Backorder Greece-Export Task Completed Successfully</h2>
             <p>Your output files are ready:</p>
             <div class="button-container">
                 <a href="{{ download_link1 }}" target="_blank" style="text-decoration: none; padding: 10px 20px; background-color: #28a745; color: white;    border-radius: 5px;">
@@ -387,7 +387,7 @@ function hideProcessingOverlay() {
                         <option value="replen_stock">Replen Stock</option>
                         <option value="check_empty_location">Check Empty Location</option>
                         <option value="target_performance">Target Performance Analysis</option>
-                        <option value="replen_backorder_greece">Replen Backorder Greece</option>
+                        <option value="replen_backorder_greece">Replen Backorder Greece-Export</option>
                     </select>
                 </div>
 
@@ -421,7 +421,7 @@ function hideProcessingOverlay() {
                    <p class="file-instructions">Upload both SALES.csv and TARGET.csv files for processing.</p>
                </div>
 
-               <!-- Replen Backorder Greece Inputs -->
+               <!-- Replen Backorder Greece-Export Inputs -->
                <div id="replen-backorder-greece-inputs" class="task-inputs">
                    <label for="file-master">Upload MASTER.csv:</label>
                    <input type="file" name="replen_backorder_files[]" id="file-master" accept=".csv" required>
