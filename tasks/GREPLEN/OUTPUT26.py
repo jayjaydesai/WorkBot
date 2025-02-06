@@ -74,10 +74,13 @@ for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=21, max_col
     elif cell.value == "Please check as ETA is closer so not allocated":
         cell.fill = PatternFill("solid", fgColor="FFA07A")  # Light Orange background
 
-# Remove rows where "PART NUMBER" column is blank
-df = df[df["PART NUMBER"].notna() & (df["PART NUMBER"].astype(str).str.strip() != "")]
+# ✅ Convert column headers to uppercase for consistency
+df.columns = [col.upper().strip() for col in df.columns]
 
-# Save the formatted workbook
+# ✅ Remove rows where "PART NUMBER" is blank
+if "PART NUMBER" in df.columns:
+    df = df[df["PART NUMBER"].notna() & (df["PART NUMBER"].str.strip() != "")]
+
+# ✅ Save the formatted workbook
 wb.save(output_file)
 print(f"SUCCESS: WORKING.xlsx has been generated with all formatting at {output_file}")
-

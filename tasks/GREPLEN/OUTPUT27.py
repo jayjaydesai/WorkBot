@@ -22,8 +22,9 @@ df = pd.DataFrame(sheet.values)
 df.columns = df.iloc[0]  # Set first row as column headers
 df = df[1:]  # Remove header row from data
 
-# Remove rows where "RELEASE" column has value "0"
-df = df[df["RELEASE"] != 0]
+# ✅ Remove rows where "RELEASE" column is zero (ensure type consistency)
+if "RELEASE" in df.columns:
+    df = df[df["RELEASE"].astype(str).str.strip() != "0"]
 
 # Write back data to the same workbook, preserving formatting
 wb.remove(sheet)  # Remove existing sheet
