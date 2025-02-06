@@ -26,7 +26,7 @@ df = pd.read_csv(output20_file, dtype=str)
 df.columns = [col.lower().strip() for col in df.columns]
 
 # Ensure required columns exist
-required_columns = ["release", "note", "customer/total/bo/qty", "actual/stock"]
+required_columns = ["release", "note", "backorder", "actual/stock"]
 missing_columns = [col for col in required_columns if col not in df.columns]
 if missing_columns:
     raise KeyError(f"ERROR: Missing required columns in OUTPUT20.csv: {missing_columns}")
@@ -36,13 +36,34 @@ df["release"] = df["release"].fillna("").astype(str).str.strip()
 df["note"] = df["note"].fillna("").astype(str).str.strip()
 
 # Convert numeric columns safely
-df["customer/total/bo/qty"] = pd.to_numeric(df["customer/total/bo/qty"], errors="coerce").fillna(0)
+df["backorder"] = pd.to_numeric(df["backorder"], errors="coerce").fillna(0)
 df["actual/stock"] = pd.to_numeric(df["actual/stock"], errors="coerce").fillna(0)
 
 # Update "release" column based on "note" column conditions
-df.loc[df["note"] == "release after", "release"] = "0"
-df.loc[df["note"] == "back/order/qty", "release"] = df["customer/total/bo/qty"].astype(str)
-df.loc[df["note"] == "actual-stock", "release"] = df["actual/stock"].astype(str)
+
+df.loc[df["note"] == "release after", "release"] = 0
+df.loc[df["note"] == "back/order/qty", "release"] = df["backorder"]
+
+# Group by "part/number" to distribute "actual/stock" among rows with "note" as "actual-stock"
+def distribute_stock(group):
+    total_stock = group["actual/stock"].iloc[0]  # Get the total actual stock for the group
+    for idx in group.index:
+        if total_stock <= 0:
+            break  # Stop distributing if stock is depleted
+        if group.loc[idx, "note"] == "actual-stock":
+            if total_stock >= group.loc[idx, "backorder"]:
+                group.loc[idx, "release"] = group.loc[idx, "backorder"]
+                total_stock -= group.loc[idx, "backorder"]
+            else:
+                group.loc[idx, "release"] = total_stock
+                total_stock = 0
+    return group
+
+# Apply the stock distribution logic for each part/number group
+df = df.groupby("part/number", group_keys=False).apply(distribute_stock)
+
+# Convert "release" column to string for saving
+df["release"] = df["release"].astype(str)
 
 # Save the result as OUTPUT21.csv
 df.to_csv(output21_file, index=False)

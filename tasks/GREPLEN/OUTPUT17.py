@@ -40,9 +40,9 @@ df["eta/qty/differencetotal"] = pd.to_numeric(df["eta/qty/differencetotal"], err
 
 # Apply filter conditions:
 # 1. "note" is blank
-# 2. "number/of/days/eta" <= 35
+# 2. "number/of/days/eta" <= 7
 # 3. "eta/qty/differencetotal" >= 0
-mask = (df["note"] == "") & (df["number/of/days/eta"] <= 35) & (df["eta/qty/differencetotal"] >= 0)
+mask = (df["note"] == "") & (df["number/of/days/eta"] <= 7) & (df["eta/qty/differencetotal"] >= 0)
 
 # Update "note" column with "release after"
 df.loc[mask, "note"] = "release after"

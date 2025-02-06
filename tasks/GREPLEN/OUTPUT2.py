@@ -42,6 +42,23 @@ try:
     # Convert "date" column to datetime format (dd-mm-yyyy)
     df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%d-%m-%Y")
 
+    # Sort by "part/number" and month extracted from the "date" column
+    if "part/number" not in df.columns:
+        raise KeyError(f"❌ ERROR: 'part/number' column not found in OUTPUT1.csv. Available columns: {list(df.columns)}")
+
+    # Convert "date" to datetime if not already done
+    df["date"] = pd.to_datetime(df["date"], format="%d-%m-%Y", errors="coerce")
+
+    # Extract "month" and "year" from "date"
+    df["month"] = df["date"].dt.month
+    df["year"] = df["date"].dt.year
+
+    # Sort by "part/number", "year", and "month"
+    df = df.sort_values(by=["part/number", "year", "month"], ascending=[True, True, True])
+
+    # Drop the temporary "month" and "year" columns after sorting
+    df = df.drop(columns=["month", "year"])
+
     # Save processed file with UTF-8 encoding
     df.to_csv(output2_file, index=False, encoding="utf-8")
 

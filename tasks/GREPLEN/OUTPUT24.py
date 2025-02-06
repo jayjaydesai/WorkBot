@@ -34,7 +34,7 @@ def determine_reason(note):
     if note == "done":
         return "Actual Stock is 0 or less"
     elif note == "release after":
-        return "ETA is within 35 days to release maximum"
+        return "ETA is within 7 days to release maximum"
     elif note == "back/order/qty":
         return "Actual Stock is more than total BO qty"
     elif note == "actual-stock":

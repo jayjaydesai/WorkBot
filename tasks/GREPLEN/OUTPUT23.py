@@ -25,6 +25,12 @@ df = pd.read_csv(output22_file, dtype=str)
 # Convert column names to uppercase for consistency
 df.columns = [col.upper().strip() for col in df.columns]
 
+# Apply rule: Update rows where "release" is blank
+df["RELEASE"] = df["RELEASE"].fillna("").astype(str).str.strip()  # Ensure "release" column is treated as string
+condition = df["RELEASE"] == ""  # Identify rows where "release" is blank
+df.loc[condition, "RELEASE"] = "0"  # Set "release" to "0"
+df.loc[condition, "NOTE"] = "No Allocation"  # Set "note" to "No Allocation"
+
 # Define the desired column sequence
 column_order = [
     "REC ID", "DATE", "DESCRIPTION", "DOCUMENT NO", "COMPANY NAME", 
